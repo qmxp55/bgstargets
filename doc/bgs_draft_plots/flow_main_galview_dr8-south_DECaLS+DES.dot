@@ -1,0 +1,99 @@
+digraph "" {
+	"[' Area:  9716.98 (sq.d) \n Bright:  3857.30 (1/sq.d) \n Faint:  1239.50 (1/sq.d)']"	 [color=lightskyblue,
+		shape=box,
+		style=filled];
+	"['LS dr8-south_DECaLS+DES (SOUTH)']"	 [color=lawngreen,
+		style=filled];
+	"['LS dr8-south_DECaLS+DES (SOUTH)']" -> "[' Area:  9716.98 (sq.d) \n Bright:  3857.30 (1/sq.d) \n Faint:  1239.50 (1/sq.d)']";
+	"['SG']"	 [color=plum,
+		style=filled];
+	"['LS dr8-south_DECaLS+DES (SOUTH)']" -> "['SG']";
+	"[' Area: 100.00 (%) \n Bright*: 860.43 (1/sq.d) \n Faint*: 590.45 (1/sq.d) \n Bright: 860.43 (1/sq.d) \n Faint: 590.45 (1/sq.d)']"	 [color=lightskyblue,
+		shape=box,
+		style=filled];
+	"['BS & LG & GC']"	 [color=lightgray,
+		style=filled];
+	"[' Area: 100.00 (%) \n Bright*: 860.43 (1/sq.d) \n Faint*: 590.45 (1/sq.d) \n Bright: 860.43 (1/sq.d) \n Faint: 590.45 (1/sq.d)']" -> "['BS & LG & GC']";
+	"['(SG) \n\n Area:  0.00 (%) \n Bright:  2996.87 (1/sq.d) \n Faint:  649.05 (1/sq.d)']"	 [color=lightcoral,
+		shape=box,
+		style=filled];
+	"['SG']" -> "[' Area: 100.00 (%) \n Bright*: 860.43 (1/sq.d) \n Faint*: 590.45 (1/sq.d) \n Bright: 860.43 (1/sq.d) \n Faint: 590.45 (1/sq.d)']";
+	"['SG']" -> "['(SG) \n\n Area:  0.00 (%) \n Bright:  2996.87 (1/sq.d) \n Faint:  649.05 (1/sq.d)']";
+	"[' Area: 97.15 (%) \n Bright*: 843.71 (1/sq.d) \n Faint*: 580.34 (1/sq.d) \n Bright: 868.45 (1/sq.d) \n Faint: 597.36 (1/sq.d)']"	 [color=lightskyblue,
+		shape=box,
+		style=filled];
+	"['nobs']"	 [color=lightgray,
+		style=filled];
+	"[' Area: 97.15 (%) \n Bright*: 843.71 (1/sq.d) \n Faint*: 580.34 (1/sq.d) \n Bright: 868.45 (1/sq.d) \n Faint: 597.36 (1/sq.d)']" -> "['nobs']";
+	"['(BS | LG | GC) \n\n Area:  2.85 (%) \n Bright:  16.73 (1/sq.d) \n Faint:  10.11 (1/sq.d)']"	 [color=lightcoral,
+		shape=box,
+		style=filled];
+	"['BS \n\n Area:  2.76 (%) \n Bright:  13.66 (1/sq.d) \n Faint:  8.52 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(BS | LG | GC) \n\n Area:  2.85 (%) \n Bright:  16.73 (1/sq.d) \n Faint:  10.11 (1/sq.d)']" -> "['BS \n\n Area:  2.76 (%) \n Bright:  13.66 (1/sq.d) \n Faint:  8.52 (1/sq.d)']";
+	"['LG \n\n Area:  0.08 (%) \n Bright:  2.94 (1/sq.d) \n Faint:  1.46 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(BS | LG | GC) \n\n Area:  2.85 (%) \n Bright:  16.73 (1/sq.d) \n Faint:  10.11 (1/sq.d)']" -> "['LG \n\n Area:  0.08 (%) \n Bright:  2.94 (1/sq.d) \n Faint:  1.46 (1/sq.d)']";
+	"['GC \n\n Area:  0.01 (%) \n Bright:  0.27 (1/sq.d) \n Faint:  0.17 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(BS | LG | GC) \n\n Area:  2.85 (%) \n Bright:  16.73 (1/sq.d) \n Faint:  10.11 (1/sq.d)']" -> "['GC \n\n Area:  0.01 (%) \n Bright:  0.27 (1/sq.d) \n Faint:  0.17 (1/sq.d)']";
+	"['BS & LG & GC']" -> "[' Area: 97.15 (%) \n Bright*: 843.71 (1/sq.d) \n Faint*: 580.34 (1/sq.d) \n Bright: 868.45 (1/sq.d) \n Faint: 597.36 (1/sq.d)']";
+	"['BS & LG & GC']" -> "['(BS | LG | GC) \n\n Area:  2.85 (%) \n Bright:  16.73 (1/sq.d) \n Faint:  10.11 (1/sq.d)']";
+	"[' Area: 96.75 (%) \n Bright*: 840.66 (1/sq.d) \n Faint*: 579.35 (1/sq.d) \n Bright: 868.91 (1/sq.d) \n Faint: 598.82 (1/sq.d)']"	 [color=lightskyblue,
+		shape=box,
+		style=filled];
+	"['QC_FM & QC_FI & QC_FF & QC_IVAR']"	 [color=plum,
+		style=filled];
+	"[' Area: 96.75 (%) \n Bright*: 840.66 (1/sq.d) \n Faint*: 579.35 (1/sq.d) \n Bright: 868.91 (1/sq.d) \n Faint: 598.82 (1/sq.d)']" -> "['QC_FM & QC_FI & QC_FF & QC_IVAR']";
+	"['(nobs) \n\n Area:  0.40 (%) \n Bright:  3.05 (1/sq.d) \n Faint:  0.98 (1/sq.d)']"	 [color=lightcoral,
+		shape=box,
+		style=filled];
+	"['nobs']" -> "[' Area: 96.75 (%) \n Bright*: 840.66 (1/sq.d) \n Faint*: 579.35 (1/sq.d) \n Bright: 868.91 (1/sq.d) \n Faint: 598.82 (1/sq.d)']";
+	"['nobs']" -> "['(nobs) \n\n Area:  0.40 (%) \n Bright:  3.05 (1/sq.d) \n Faint:  0.98 (1/sq.d)']";
+	"[' Area: 96.75 (%) \n Bright*: 822.40 (1/sq.d) \n Faint*: 565.53 (1/sq.d) \n Bright: 850.04 (1/sq.d) \n Faint: 584.54 (1/sq.d)']"	 [color=lightskyblue,
+		shape=box,
+		style=filled];
+	"['FMC2 & CC']"	 [color=plum,
+		style=filled];
+	"[' Area: 96.75 (%) \n Bright*: 822.40 (1/sq.d) \n Faint*: 565.53 (1/sq.d) \n Bright: 850.04 (1/sq.d) \n Faint: 584.54 (1/sq.d)']" -> "['FMC2 & CC']";
+	"['(QC_FM | QC_FI | QC_FF | QC_IVAR) \n\n Area:  0.00 (%) \n Bright:  18.26 (1/sq.d) \n Faint:  13.82 (1/sq.d)']"	 [color=lightcoral,
+		shape=box,
+		style=filled];
+	"['QC_FM \n\n Area:  0.00 (%) \n Bright:  5.14 (1/sq.d) \n Faint:  3.13 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(QC_FM | QC_FI | QC_FF | QC_IVAR) \n\n Area:  0.00 (%) \n Bright:  18.26 (1/sq.d) \n Faint:  13.82 (1/sq.d)']" -> "['QC_FM \n\n Area:  0.00 (%) \n Bright:  5.14 (1/sq.d) \n Faint:  3.13 (1/sq.d)']";
+	"['QC_FI \n\n Area:  0.00 (%) \n Bright:  1.14 (1/sq.d) \n Faint:  0.51 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(QC_FM | QC_FI | QC_FF | QC_IVAR) \n\n Area:  0.00 (%) \n Bright:  18.26 (1/sq.d) \n Faint:  13.82 (1/sq.d)']" -> "['QC_FI \n\n Area:  0.00 (%) \n Bright:  1.14 (1/sq.d) \n Faint:  0.51 (1/sq.d)']";
+	"['QC_FF \n\n Area:  0.00 (%) \n Bright:  14.11 (1/sq.d) \n Faint:  10.89 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(QC_FM | QC_FI | QC_FF | QC_IVAR) \n\n Area:  0.00 (%) \n Bright:  18.26 (1/sq.d) \n Faint:  13.82 (1/sq.d)']" -> "['QC_FF \n\n Area:  0.00 (%) \n Bright:  14.11 (1/sq.d) \n Faint:  10.89 (1/sq.d)']";
+	"['QC_IVAR \n\n Area:  0.00 (%) \n Bright:  0.01 (1/sq.d) \n Faint:  0.01 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(QC_FM | QC_FI | QC_FF | QC_IVAR) \n\n Area:  0.00 (%) \n Bright:  18.26 (1/sq.d) \n Faint:  13.82 (1/sq.d)']" -> "['QC_IVAR \n\n Area:  0.00 (%) \n Bright:  0.01 (1/sq.d) \n Faint:  0.01 (1/sq.d)']";
+	"['QC_FM & QC_FI & QC_FF & QC_IVAR']" -> "[' Area: 96.75 (%) \n Bright*: 822.40 (1/sq.d) \n Faint*: 565.53 (1/sq.d) \n Bright: 850.04 (1/sq.d) \n Faint: 584.54 (1/sq.d)']";
+	"['QC_FM & QC_FI & QC_FF & QC_IVAR']" -> "['(QC_FM | QC_FI | QC_FF | QC_IVAR) \n\n Area:  0.00 (%) \n Bright:  18.26 (1/sq.d) \n Faint:  13.82 (1/sq.d)']";
+	"[' Area: 96.75 (%) \n Bright*: 818.02 (1/sq.d) \n Faint*: 559.13 (1/sq.d) \n Bright: 845.51 (1/sq.d) \n Faint: 577.92 (1/sq.d)']"	 [color=lightskyblue,
+		shape=box,
+		style=filled];
+	"['(FMC2 | CC) \n\n Area:  0.00 (%) \n Bright:  4.38 (1/sq.d) \n Faint:  6.40 (1/sq.d)']"	 [color=lightcoral,
+		shape=box,
+		style=filled];
+	"['FMC2 \n\n Area:  0.00 (%) \n Bright:  3.49 (1/sq.d) \n Faint:  3.79 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(FMC2 | CC) \n\n Area:  0.00 (%) \n Bright:  4.38 (1/sq.d) \n Faint:  6.40 (1/sq.d)']" -> "['FMC2 \n\n Area:  0.00 (%) \n Bright:  3.49 (1/sq.d) \n Faint:  3.79 (1/sq.d)']";
+	"['CC \n\n Area:  0.00 (%) \n Bright:  0.91 (1/sq.d) \n Faint:  2.64 (1/sq.d)']"	 [color=coral,
+		shape=box,
+		style=filled];
+	"['(FMC2 | CC) \n\n Area:  0.00 (%) \n Bright:  4.38 (1/sq.d) \n Faint:  6.40 (1/sq.d)']" -> "['CC \n\n Area:  0.00 (%) \n Bright:  0.91 (1/sq.d) \n Faint:  2.64 (1/sq.d)']";
+	"['FMC2 & CC']" -> "[' Area: 96.75 (%) \n Bright*: 818.02 (1/sq.d) \n Faint*: 559.13 (1/sq.d) \n Bright: 845.51 (1/sq.d) \n Faint: 577.92 (1/sq.d)']";
+	"['FMC2 & CC']" -> "['(FMC2 | CC) \n\n Area:  0.00 (%) \n Bright:  4.38 (1/sq.d) \n Faint:  6.40 (1/sq.d)']";
+}
