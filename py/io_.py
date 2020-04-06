@@ -10,7 +10,7 @@ import astropy.units as units
 
 from cuts import getGeoCuts, getPhotCuts, get_bgs, get_bgs_sv
 
-def getBGSbits(mycatpath=None, filename=None,  sweepdir='/global/cscratch1/sd/qmxp55/sweep_files/', mycat=True, getmycat=False):
+def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False):
     
     import time
     start = time.time()
@@ -38,6 +38,7 @@ def getBGSbits(mycatpath=None, filename=None,  sweepdir='/global/cscratch1/sd/qm
             col = col.upper()
             if col == 'BGSBITS': continue
             tab[col] = df[col]
+            
     # create BGSBITS: bits associated to selection criteria
   
     geocuts = getGeoCuts(tab)
@@ -84,8 +85,9 @@ def getBGSbits(mycatpath=None, filename=None,  sweepdir='/global/cscratch1/sd/qm
         if key in list(BGSsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
         elif key in list(BGSSVsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSSVsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
         else: print('\t %s, %i, %i' %(key, np.sum(bgscuts[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
-                                
-    np.save(sweepdir+filename, tab)
+           
+    if outdir is not None:
+        np.save(outdir, tab)
 
     end = time.time()
     print('Total run time: %f sec' %(end - start))
@@ -93,7 +95,7 @@ def getBGSbits(mycatpath=None, filename=None,  sweepdir='/global/cscratch1/sd/qm
     return tab
     
 
-def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False, bgsbits=False, opt='1', sweepdir='/global/cscratch1/sd/qmxp55/sweep_files/', version='debug'):
+def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False, bgsbits=False, opt='1', sweepdir='/global/cscratch1/sd/qmxp55/bgstargets_output/'):
     """
     Extract data from DECaLS DR7 SWEEPS files only.
     
@@ -119,9 +121,9 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     if maskbitsource: namelab.append('maskbitsource')
     #print(namelab)
     
-    if (len(namelab) > 0) & (patch is None): sweep_file_name = '%s_sweep_whole_%s_v%s' %(dr, '_'.join(namelab), version)
-    elif (len(namelab) > 0) & (patch is not None): sweep_file_name = '%s_sweep_%s_v%s' %(dr, '_'.join(namelab), version)
-    else: sweep_file_name = '%s_sweep_whole_v%s' %(dr, version)
+    if (len(namelab) > 0) & (patch is None): sweep_file_name = '%s_sweep_whole_%s' %(dr, '_'.join(namelab))
+    elif (len(namelab) > 0) & (patch is not None): sweep_file_name = '%s_sweep_%s' %(dr, '_'.join(namelab))
+    else: sweep_file_name = '%s_sweep_whole' %(dr)
         
     sweep_file = os.path.isfile(sweepdir+sweep_file_name+'.npy')
     sweep_dir_dr7 = os.path.join('/global/project/projectdirs/cosmo/data/legacysurvey/','dr7', 'sweep', '7.1')
@@ -129,27 +131,31 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr8north = '/global/project/projectdirs/cosmo/data/legacysurvey/dr8/north/sweep/8.0'
     sweep_dir_dr9dsouth = '/global/cscratch1/sd/desimpp/dr9d/south/sweep'
     sweep_dir_dr9dnorth = '/global/cscratch1/sd/desimpp/dr9d/north/sweep'
+    sweep_dir_dr9svsouth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9sv/south/sweep'
+    sweep_dir_dr9svnorth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9sv/north/sweep'
     
     if not sweep_file:
         if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
         elif dr == 'dr8-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr is 'dr8-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif (dr is 'dr8') or (dr is 'dr9d'):
-            if dr is 'dr8':
-                sweep_north = sweep_dir_dr8north
-                sweep_south = sweep_dir_dr8south
-            elif dr is 'dr9d':
-                sweep_north = sweep_dir_dr9dnorth
-                sweep_south = sweep_dir_dr9dsouth
-                
-            print('getting data in the SOUTH')
-            dfsouth = cut_sweeps(patch=patch, sweep_dir=sweep_south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-            print('getting data in the NORTH')
-            dfnorth = cut_sweeps(patch=patch, sweep_dir=sweep_north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-            
-            if dfnorth is None: df = dfsouth
-            elif dfsouth is None: df = dfnorth
-            else: df = np.concatenate((dfnorth, dfsouth))
+        elif dr == 'dr8-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9sv-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9sv-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        #elif (dr is 'dr8') or (dr is 'dr9d'):
+        #    if dr is 'dr8':
+        #        sweep_north = sweep_dir_dr8north
+        #        sweep_south = sweep_dir_dr8south
+        #    elif dr is 'dr9d':
+        #        sweep_north = sweep_dir_dr9dnorth
+        #        sweep_south = sweep_dir_dr9dsouth
+        #        
+        #    print('getting data in the SOUTH')
+        #    dfsouth = cut_sweeps(patch=patch, sweep_dir=sweep_south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        #    print('getting data in the NORTH')
+        #    dfnorth = cut_sweeps(patch=patch, sweep_dir=sweep_north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        #    
+        #    if dfnorth is None: df = dfsouth
+        #    elif dfsouth is None: df = dfnorth
+        #    else: df = np.concatenate((dfnorth, dfsouth))
                 
         tab = Table()
         for col in df.dtype.names:
@@ -423,7 +429,7 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
         nside,nest   = hdr['hpxnside'],hdr['hpxnest']
         npix         = hp.nside2npix(nside)
         pixarea      = hp.nside2pixarea(nside,degrees=True)
-    else: raise ValueErro('if not pixel information given, include pixmapfile to compute them.')
+    else: raise ValueError('if not pixel information given, include pixmapfile to compute them.')
     
     if (getnobs) and (randoms is None):
         raise ValueError('random catalogue can not be None when getnobs is set True.')
@@ -665,9 +671,8 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
     import time
     start = time.time()
         
-    if (N < 2):
-        log.warning('Number of RANDOMS files must be greater than one')
-        raise ValueError
+    if (N < 2) & (dr == 'dr8'):
+        raise ValueError('Number of RANDOMS files must be greater than one')
     
     import glob
     #ranpath = '/global/project/projectdirs/desi/target/catalogs/dr7.1/0.29.0/' #issues with MASKBITS...
@@ -683,14 +688,17 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
         elif (dr == 'dr8'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr8/0.31.0/randoms/'
             randoms = glob.glob(ranpath + 'randoms-inside*')
+        elif (dr == 'dr9sv'):
+            ranpath = '/global/cfs/cdirs/desi/target/catalogs/dr9sv/0.37.0/randoms/'
+            randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
         elif (dr == 'dr9d'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9d/PRnone/randoms/'
             random_south = ranpath + 'dr9d-south/' + 'randoms-dr9-hp-X-1.fits'
             random_north = ranpath + 'dr9d-north/' + 'randoms-dr9-hp-X-1.fits'
             randoms = [random_south, random_north]
             
-        randoms.sort()
-        if dr != 'dr9d': randoms = randoms[0:N]
+        if len(randoms) > 1: randoms.sort()
+        if dr == 'dr8': randoms = randoms[0:N]
 
         for i in range(len(randoms)):
             df_ran = fitsio.read(randoms[i], columns=['RA', 'DEC', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'MASKBITS'],upper=True, ext=1)
@@ -784,19 +792,21 @@ def get_svfields(ra, dec):
     
     svfields = {}
 
-    #svfields['s82'] = [30, 40, -7, 2.0] #90
+    svfields['s82'] = [30, 40, -7, 2.0] #90
     svfields['egs'] = [210, 220, 50, 55] #31
     svfields['g09'] = [129, 141, -2.0, 3.0] #60
     svfields['g12'] = [174, 186, -3.0, 2.0] #60
     svfields['g15'] = [211, 224, -2.0, 3.0] #65
-    #svfields['overlap'] = [135, 160, 30, 35] #104
+    svfields['overlap'] = [135, 160, 30, 35] #104
     svfields['refnorth'] = [215, 230, 41, 46] #56
-    #svfields['ages'] = [215, 220, 30, 40] #40
+    svfields['ages'] = [215, 220, 30, 40] #40
     svfields['sagittarius'] = [200, 210, 5, 10] #49
     svfields['highebv_n'] = [140, 150, 65, 70] #19
     svfields['highebv_s'] = [240, 245, 20, 25] #23
     svfields['highstardens_n'] = [273, 283, 40, 45] #37
     svfields['highstardens_s'] = [260, 270, 15, 20] #47
+    svfields['s82_s'] = [330, 340, -2, 3] #51
+    
     
     keep = np.zeros_like(ra, dtype='?')
     for key, val in zip(svfields.keys(), svfields.values()):
@@ -826,4 +836,3 @@ def get_msmask(masksources):
     print('%i Bright Stars' %(np.sum(keep)))
     
     return tab
-    

@@ -151,7 +151,7 @@ def get_bgs(df, mycat=False):
     bgscuts = geocuts
     bgscuts.update(photcuts)
     
-    bgslist = ['BS', 'LG', 'GC', 'nobs', 'SG', 'FMC2', 'CC', 'QC_FM', 'QC_FI', 'QC_FF', 'QC_IVAR']
+    bgslist = ['BS', 'LG', 'GC', 'nobs', 'SG', 'FMC2', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
     bgs = np.ones_like(df['RA'], dtype='?')
     bgs_bright = bgs.copy()
     bgs_faint = bgs.copy()
@@ -182,8 +182,8 @@ def get_bgs_sv(df, mycat=False):
     bgscuts = geocuts
     bgscuts.update(photcuts)
     
-    bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF', 'QC_IVAR']
-    lowlist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF', 'QC_IVAR']
+    bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
+    #lowlist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
     bgs_sv = np.ones_like(df['RA'], dtype='?')
     bgs_sv_bright = bgs_sv.copy()
     bgs_sv_faint = bgs_sv.copy()
@@ -229,3 +229,17 @@ def get_galaxies_sv(gaiagmag, fluxr, psflike):
     GAIA_GAL &= ((Grr  >  0.6) | (gaiagmag == 0)) | ((Grr < 0.6) & (~psflike) & (gaiagmag != 0))
     
     return GAIA_GAL
+
+def bgsbut(bgsbits=None, rmag=None, pop=None, bgsmask=None, rlimit=20):
+    
+    bgslist = ['BS', 'LG', 'GC', 'nobs', 'SG', 'FMC2', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
+    if pop is not None:
+        [bgslist.remove(i) for i in pop]
+    
+    bgsbut = np.ones_like(rmag, dtype=bool)
+    for key in bgslist:
+        keep = ((bgsbits & 2**(bgsmask[key])) != 0)
+        bgsbut &= keep
+    bgsbut &= rmag < rlimit
+    
+    return bgsbut

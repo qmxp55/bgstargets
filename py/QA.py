@@ -17,6 +17,7 @@ import pygraphviz as pgv
 from PIL import Image
 import matplotlib.gridspec as gridspec
 from scipy.interpolate import interp1d
+from matplotlib_venn import venn3, venn3_circles
 
 from io_ import search_around
 
@@ -424,8 +425,8 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         if area is not None: ax.text(xlim[1]-5*dx, ylim[1]-2*dy, r'$\eta$. %.2f/deg$^2$' %(Ntot/area), size=15)
         ax.text(xlim[0]+dx, ylim[1]-dy, r'f.gal. %.2f %%' %(100 * np.sum(maskhigh)/Ntot), size=15)
         ax.text(xlim[0]+dx, ylim[0]+dy, r'f.stars. %.2f %%' %(100 * np.sum(masklow)/Ntot), size=15)
-    if ylab: ax.set_ylabel(r'%s' %(y), size=20)
-    if xlab: ax.set_xlabel(r'%s' %(x), size=20)
+    if ylab: ax.set_ylabel(r'%s' %(y), size=25)
+    if xlab: ax.set_xlabel(r'%s' %(x), size=25)
     if hline is not None: ax.axhline(hline, ls='--', lw=2, c='r')
     if vline is not None: ax.axvline(vline, ls='--', lw=2, c='r')
     if fmcline: 
@@ -981,6 +982,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
         
         if scaling:
             d2d_arcsec = d2d
+            #d2d is already in arcsec with r^2 = ra^2*cos(dec)^2 + dec^2
             d_ra, d_dec, d2d = d_ra/mag_radii, d_dec/mag_radii, d2d_arcsec/mag_radii
             search_radius = SR_scaling #d2d.max() - d2d.max()*0.3
             #ntot_annulus = np.sum((d2d_arcsec>annulus_min) & (d2d<search_radius))
@@ -1248,10 +1250,48 @@ def limits():
     limits = {}
     limits['Grr'] = (-3, 5)
     limits['G-rr'] = (-3, 5)
-    limits['g-z'] = (-1.8, 6)
+    limits['g-z'] = (-2, 6)
     limits['r'] = (15, 20.1)
-    limits['rfibmag'] = (16, 26)
-    limits['g-r'] = (-0.5, 2.3)
+    limits['rfibmag'] = (16, 27)
+    limits['g-r'] = (-2, 6)
     limits['r-z'] = (-0.7, 2.8)
     
     return limits
+
+def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None):
+    '''inputs A, B, C must booleans.'''
+    
+    A1 = A
+    B1 = B
+    C1 = C
+    AB = (A1) & (B1)
+    AC = (A1) & (C1)
+    BC = (B1) & (C1)
+    ABC = (A1) & (B1) & (C1)
+            
+    if norm is None: norm, sf = 1, 1
+    else: sf = 1
+        
+    a1 = round((np.sum(A1) - np.sum(AB) - np.sum(AC) + np.sum(ABC))/norm, sf)
+    a2 = round((np.sum(B1) - np.sum(AB) - np.sum(BC) + np.sum(ABC))/norm, sf)
+    a3 = round((np.sum(AB) - np.sum(ABC))/norm, sf)
+    a4 = round((np.sum(C1) - np.sum(AC) - np.sum(BC) + np.sum(ABC))/norm, sf)
+    a5 = round((np.sum(AC) - np.sum(ABC))/norm, sf)
+    a6 = round((np.sum(BC) - np.sum(ABC))/norm, sf)
+    a7 = round(np.sum(ABC)/norm, sf)
+        
+    if labels is None: labels = ['Group A', 'Group B', 'Group C']
+        
+    fig = plt.figure(figsize=(7,7))
+    v=venn3([a1, a2, a3, a4, a5, a6, a7], set_labels = (labels[0], labels[1], labels[2]))
+    c=venn3_circles([a1, a2, a3, a4, a5, a6, a7], linestyle='dotted', linewidth=1, color="grey")
+    #c[1].set_lw(1.0)
+    c[1].set_ls('solid')
+    c[2].set_ls('dashed')
+    #c[1].set_color('skyblue')
+    
+    if title is not None: plt.title(title, size=20)
+    if file is not None:
+        fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
+
+    plt.show()
