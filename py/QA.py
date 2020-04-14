@@ -394,7 +394,8 @@ def masking(title, submasks, details):
 
 def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', ylab=True, xlab=True, vline=None, 
            hline=None, fig=None, gs=None, xlim=None, ylim=None, vmin=None, vmax=None, mincnt=1, fmcline=False, 
-               file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None):
+               file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None, clab=None, 
+                   contour1=None, contour2=None, levels1=None, levels2=None):
     
     x, y = coord.keys()
     
@@ -464,6 +465,18 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
     ax.set_xlim(xlim[0], xlim[1])
     ax.set_ylim(ylim[0], ylim[1])
     
+    if contour1 is not None:
+        if levels1 is None: levels1 = (0, 10)
+        bgs_den = density_patch(coord=contour1, xlim=xlim, ylim=ylim, plot=False, nmin=0)
+        ax.contour(bgs_den.transpose(), levels=levels1, origin='lower', aspect='equal',
+              extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='black', linewidths=4, alpha=0.5)
+        
+    if contour2 is not None:
+        if levels2 is None: levels2 = (0, 10)
+        bgs_den = density_patch(coord=contour2, xlim=xlim, ylim=ylim, plot=False, nmin=0)
+        ax.contour(bgs_den.transpose(), levels=levels2, origin='lower', aspect='equal',
+              extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='red', linewidths=4, alpha=0.5)
+    
     #clab = r'$N$'
     if cbar in ['horizontal', 'vertical']:
         cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=0.15)
@@ -471,7 +484,8 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         cbar_ax = fig.add_axes([0.95, 0.15, 0.02, 0.7])
         cb = fig.colorbar(pos, cax=cbar_ax)
     else: raise ValueError('cbar is either vertical, horizontal or panel.')
-    cb.set_label(label=r'$N$', size='large', weight='bold')
+    if clab is None: clab = r'$N$'
+    cb.set_label(label=clab, size='large', weight='bold')
     cb.ax.tick_params(labelsize='large')
     
     if file is not None:
@@ -662,6 +676,9 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             elif reg == 'north': ynorth = systv
             elif reg == 'decals': ydecals = systv
             elif reg == 'des': ydes = systv
+            
+    if weights:
+        return b0, m0
     #return x, yall, ynorth, ydecals, ydes
     
 def pixcorr(x=None, y=None, nx=20, xlim=None):
@@ -1258,7 +1275,7 @@ def limits():
     
     return limits
 
-def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None):
+def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None, colors=None):
     '''inputs A, B, C must booleans.'''
     
     A1 = A
@@ -1281,17 +1298,111 @@ def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None):
     a7 = round(np.sum(ABC)/norm, sf)
         
     if labels is None: labels = ['Group A', 'Group B', 'Group C']
+    if colors is None: colors = ['r', 'green', 'b']
         
     fig = plt.figure(figsize=(7,7))
-    v=venn3([a1, a2, a3, a4, a5, a6, a7], set_labels = (labels[0], labels[1], labels[2]))
-    c=venn3_circles([a1, a2, a3, a4, a5, a6, a7], linestyle='dotted', linewidth=1, color="grey")
+    v=venn3([a1, a2, a3, a4, a5, a6, a7], set_labels = (labels[0], labels[1], labels[2]), set_colors=(colors), alpha = 0.6)
+    c=venn3_circles([a1, a2, a3, a4, a5, a6, a7], linestyle='dotted', linewidth=1, color="k")
     #c[1].set_lw(1.0)
-    c[1].set_ls('solid')
-    c[2].set_ls('dashed')
-    #c[1].set_color('skyblue')
+    #if colors is not None:
+        #c[0].set_color(colors[0])
+        #c[1].set_color(colors[1])
+        #c[2].set_color(colors[2])
+    #c[0].set_ls('dotted')
+    #c[1].set_ls('solid')
+    #c[2].set_ls('dashed')
+    #c[1].set_lw(2.0)
     
     if title is not None: plt.title(title, size=20)
     if file is not None:
         fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
 
     plt.show()
+    
+
+def scatterplot(coord=None, catmask=None, xlim=None, ylim=None, title=None, fig=None, gs=None, n=None, ylab=True, 
+                xlab=True, hline=None, vline=None, fmcline=False, file=None, contour1=None):
+    
+    x, y = coord.keys()
+    
+    ax = fig.add_subplot(gs[n])
+    if title is not None: ax.set_title(r'%s' %(title), size=20)
+    if xlim is None: xlim = limits()[x]
+    if ylim is None: ylim = limits()[y]
+    masklims = (coord[x] > xlim[0]) & (coord[x] < xlim[1]) & (coord[y] > ylim[0]) & (coord[y] < ylim[1])
+    
+    if catmask is None: 
+        keep = masklims
+        ax.scatter(coord[x][keep], coord[y][keep])
+    else:
+        for key, val in zip(catmask.keys(), catmask.values()):
+            keep = (val) & (masklims)
+            
+            if np.sum(keep) < 100: s = 15
+            elif np.sum(keep) > 1000: s = 1
+            else: s = 3
+        
+            ax.scatter(coord[x][keep], coord[y][keep], s=s, label=key)
+            
+    if ylab: ax.set_ylabel(r'%s' %(y), size=20)
+    if xlab: ax.set_xlabel(r'%s' %(x), size=20)
+    if hline is not None: ax.axhline(hline, ls='--', lw=2, c='r')
+    if vline is not None: ax.axvline(vline, ls='--', lw=2, c='r')
+    if fmcline: 
+        x_N1 = np.linspace(15.5, 17.1, 4)
+        ax.plot(x_N1, 2.9 + 1.2 + x_N1, color='r', ls='--', lw=2)
+        x_N2 = np.linspace(17.1, 18.3, 4)
+        ax.plot(x_N2, x_N2*0.+21.2, color='r', ls='--', lw=2)
+        x_N3 = np.linspace(18.3, 20.1, 4)
+        ax.plot(x_N3, 2.9 + x_N3, color='r', ls='--', lw=2)
+        
+    lgnd = plt.legend()
+    [handle.set_sizes([20]) for handle in lgnd.legendHandles]
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    
+    #contour galaxies
+    #np.logspace(0, 2, 5)
+    if contour1 is not None:
+        bgs_den = density_patch(coord=contour1, xlim=xlim, ylim=ylim, plot=False, nmin=0)
+        ax.contour(bgs_den.transpose(), levels=(0, 10), origin='lower', aspect='equal',
+              extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='black', alpha=0.3)
+        
+    if file is not None:
+        fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
+        
+def density_patch(coord=None, xlim=None, ylim=None, nbins=100, plot=False, title=None, nmin=None):
+    
+    from matplotlib.colors import LogNorm
+    
+    x, y = coord.keys()
+    
+    if title is not None: ax.set_title(r'%s' %(title), size=20)
+    if xlim is None: xlim = limits()[x]
+    if ylim is None: ylim = limits()[y]
+    masklims = (coord[x] > xlim[0]) & (coord[x] < xlim[1]) & (coord[y] > ylim[0]) & (coord[y] < ylim[1])
+    
+    bins = np.linspace(xlim[0], xlim[1], nbins)
+    bin_spacing = bins[1] - bins[0]
+    bincenter = (bins[1:]+bins[:-1])/2
+    #mesh_x, mesh_y = np.meshgrid(bincenter, bincenter)
+    
+    xx, yy = coord[x][masklims], coord[y][masklims]
+    #xx, yy = coord[x], coord[y]
+    
+    #taking the 2d histogram and divide by the area of each bin to get the density
+    density, _, _ = np.histogram2d(xx, yy, bins=bins)
+    if nmin is not None:
+        density[density < nmin] = np.nan
+    
+    if plot:
+        plt.figure(figsize=(8, 8))
+        plt.imshow(density.transpose(), origin='lower', aspect='equal',
+               cmap='seismic', extent=np.array([xlim[0], xlim[1], ylim[0], ylim[1]]), norm=LogNorm()) #, vmin=-3, vmax=3
+        #plt.imshow(density.transpose(),
+        #       cmap='seismic', norm=LogNorm()) #, vmin=-3, vmax=3
+        plt.colorbar(fraction=0.046, pad=0.04)
+        plt.xlabel(x, size=20)
+        plt.ylabel(y, size=20)
+    
+    return density

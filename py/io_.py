@@ -836,3 +836,16 @@ def get_msmask(masksources):
     print('%i Bright Stars' %(np.sum(keep)))
     
     return tab
+
+def gaiaAEN(inGAIA=None, size=None, G=None, AEN=None):
+    #definition for DR8 
+    
+    #Stars with AEN class...
+    stars_aen = np.zeros(size, dtype='?')
+    stars_aen |= ((inGAIA) & (G < 19) & (AEN < 10**(0.5))) 
+    stars_aen |= ((inGAIA) & (G >= 19) & (AEN < 10**(0.5 + 0.2*(G - 19.))))
+    #Galaxies with AEN class...
+    gal_aen = (inGAIA) & (~stars_aen)
+    
+    return stars_aen, gal_aen
+
