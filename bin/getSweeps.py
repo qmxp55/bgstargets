@@ -27,14 +27,17 @@ if ns.patch is not None:
     patch = [np.float(patch_[0]), np.float(patch_[1]), np.float(patch_[2]), np.float(patch_[3])]
 else:
     patch = None
+    
+if ns.rlim == 'None': rlim = None
+else: rlim = np.float(ns.rlim)
 
 
 #print('===========')
-#print('patch',patch)
+print('patch',patch)
 #print('dr', ns.dr)
 #print('dr type', type(ns.dr))
-#print('rlim', ns.rlim)
+print('rlim', ns.rlim)
 #print('filepath', ns.f)
 #print('===========')
 
-cat =  get_sweep_whole(patch=patch, dr=ns.dr, rlimit=np.float(ns.rlim), maskbitsource=False, bgsbits=False, opt='1', sweepdir=ns.OF)
+cat =  get_sweep_whole(patch=patch, dr=ns.dr, rlimit=rlim, maskbitsource=False, bgsbits=False, opt='1', sweepdir=ns.OF)

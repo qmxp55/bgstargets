@@ -508,6 +508,8 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     hpdict['isnorth'][tmp] = True
     hpdict['isdes']   = get_isdes(hpdict['ra'],hpdict['dec'])
     hpdict['isdecals'] = (hpdict['issouth']) & (~hpdict['isdes'])
+    hpdict['issouth_n'] = (hpdict['issouth']) & (hpdict['galb']>0)
+    hpdict['issouth_s'] = (hpdict['issouth']) & (hpdict['galb']<0)
     hpdict['issvfields'] = get_svfields(hpdict['ra'],hpdict['dec'])
     hpdict['issvfields_n'] = (hpdict['issvfields']) & (hpdict['isnorth'])
     hpdict['issvfields_s'] = (hpdict['issvfields']) & (hpdict['issouth'])
@@ -516,7 +518,7 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
 
     # areas
     hpdict['area_all']   = hpdict['bgsfracarea'].sum() * pixarea
-    for reg in ['south','decals','des','north', 'svfields', 'svfields_n', 'svfields_s']:
+    for reg in ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']:
         hpdict['bgsarea_'+reg]   = hpdict['bgsfracarea'][hpdict['is'+reg]].sum() * pixarea
     if log: print('areas DONE...')
     
@@ -578,7 +580,7 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
             ## south + north density
             hpdens = (hpdict['south_n'+namesel] + hpdict['north_n'+namesel] ) / (pixarea * hpdict['bgsfracarea'])
             ## split per region
-            for reg in ['all','des','decals','north', 'south', 'svfields', 'svfields_n', 'svfields_s']:
+            for reg in ['all','des','decals','north', 'south', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']:
                 if (reg=='all'):
                     hpdict['meandens_'+namesel+'_'+reg] = np.nanmean(hpdens[isdesi])
                 else:
@@ -589,7 +591,7 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
         isdesi = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
         for namesel in namesels.keys():
             ## split per region
-            for reg in ['all','des','decals','north', 'south', 'svfields', 'svfields_n', 'svfields_s']:
+            for reg in ['all','des','decals','north', 'south', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']:
                 if (reg=='all'):
                     hpdict['dens_'+namesel+'_'+reg] = (hpdict['south_n'+namesel][isdesi] + hpdict['north_n'+namesel][isdesi]).sum() / (pixarea * hpdict['bgsfracarea'][isdesi].sum())
                 else:
@@ -770,6 +772,90 @@ def search_around(ra1, dec1, ra2, dec2, search_radius=1., verbose=True):
 	d_ra       = d_ra * np.cos(dec1[idx1]/180*np.pi)
 	##########################################
 	return idx1, idx2, d2d, d_ra, d_dec
+
+# https://desi.lbl.gov/svn/docs/technotes/targeting/target-truth/trunk/python/match_coord.py
+# slightly edited (plot_q and keep_all_pairs removed; u => units)
+def match_coord(ra1, dec1, ra2, dec2, search_radius=1., nthneighbor=1, verbose=True):
+	'''
+	Match objects in (ra2, dec2) to (ra1, dec1). 
+
+	Inputs: 
+		RA and Dec of two catalogs;
+		search_radius: in arcsec;
+		(Optional) keep_all_pairs: if true, then all matched pairs are kept; otherwise, if more than
+		one object in t2 is match to the same object in t1 (i.e. double match), only the closest pair
+		is kept.
+
+	Outputs: 
+		idx1, idx2: indices of matched objects in the two catalogs;
+		d2d: distances (in arcsec);
+		d_ra, d_dec: the differences (in arcsec) in RA and Dec; note that d_ra is the actual angular 
+		separation;
+	'''
+	t1 = Table()
+	t2 = Table()
+	# protect the global variables from being changed by np.sort
+	ra1, dec1, ra2, dec2 = map(np.copy, [ra1, dec1, ra2, dec2])
+	t1['ra'] = ra1
+	t2['ra'] = ra2
+	t1['dec'] = dec1
+	t2['dec'] = dec2
+	t1['id'] = np.arange(len(t1))
+	t2['id'] = np.arange(len(t2))
+	# Matching catalogs
+	sky1 = SkyCoord(ra1*units.degree,dec1*units.degree, frame='icrs')
+	sky2 = SkyCoord(ra2*units.degree,dec2*units.degree, frame='icrs')
+	idx, d2d, d3d = sky2.match_to_catalog_sky(sky1, nthneighbor=nthneighbor)
+	# This finds a match for each object in t2. Not all objects in t1 catalog are included in the result. 
+
+	# convert distances to numpy array in arcsec
+	d2d = np.array(d2d.to(units.arcsec))
+	matchlist = d2d<search_radius
+	if np.sum(matchlist)==0:
+		if verbose:
+			print('0 matches')
+		return np.array([], dtype=int), np.array([], dtype=int), np.array([]), np.array([]), np.array([])
+	t2['idx'] = idx
+	t2['d2d'] = d2d
+	t2 = t2[matchlist]
+	init_count = np.sum(matchlist)
+	#--------------------------------removing doubly matched objects--------------------------------
+	# if more than one object in t2 is matched to the same object in t1, keep only the closest match
+	t2.sort('idx')
+	i = 0
+	while i<=len(t2)-2:
+		if t2['idx'][i]>=0 and t2['idx'][i]==t2['idx'][i+1]:
+			end = i+1
+			while end+1<=len(t2)-1 and t2['idx'][i]==t2['idx'][end+1]:
+				end = end+1
+			findmin = np.argmin(t2['d2d'][i:end+1])
+			for j in range(i,end+1):
+				if j!=i+findmin:
+					t2['idx'][j]=-99
+			i = end+1
+		else:
+			i = i+1
+
+	mask_match = t2['idx']>=0
+	t2 = t2[mask_match]
+	t2.sort('id')
+	if verbose:
+		print('Doubly matched objects = %d'%(init_count-len(t2)))
+	# -----------------------------------------------------------------------------------------
+	if verbose:
+		print('Final matched objects = %d'%len(t2))
+	# This rearranges t1 to match t2 by index.
+	t1 = t1[t2['idx']]
+	d_ra = (t2['ra']-t1['ra']) * 3600.    # in arcsec
+	d_dec = (t2['dec']-t1['dec']) * 3600. # in arcsec
+	##### Convert d_ra to actual arcsecs #####
+	mask = d_ra > 180*3600
+	d_ra[mask] = d_ra[mask] - 360.*3600
+	mask = d_ra < -180*3600
+	d_ra[mask] = d_ra[mask] + 360.*3600
+	d_ra = d_ra * np.cos(t1['dec']/180*np.pi)
+	##########################################
+	return np.array(t1['id']), np.array(t2['id']), np.array(t2['d2d']), np.array(d_ra), np.array(d_dec)
 
 def get_isdes(ra,dec):
 	hdu = fits.open('/global/cscratch1/sd/raichoor/desits/des_hpmask.fits')

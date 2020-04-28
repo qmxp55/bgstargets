@@ -395,11 +395,22 @@ def masking(title, submasks, details):
 def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', ylab=True, xlab=True, vline=None, 
            hline=None, fig=None, gs=None, xlim=None, ylim=None, vmin=None, vmax=None, mincnt=1, fmcline=False, 
                file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None, clab=None, 
-                   contour1=None, contour2=None, levels1=None, levels2=None):
+                   contour1=None, contour2=None, levels1=None, levels2=None, showmedian=False, plothist=False):
     
     x, y = coord.keys()
     
-    ax = fig.add_subplot(gs[n])
+    #ax = fig.add_subplot(gs[n])
+    
+    if plothist:
+        left, width = 0.1, 0.85
+        bottom, height = 0.1, 0.85
+        main = [left, bottom, width, height]
+        
+        #ax = fig.add_subplot(gs[n])
+        ax = fig.add_axes(main, gs[n])
+    else:
+        ax = fig.add_subplot(gs[n])
+    
     if title is not None: ax.set_title(r'%s' %(title), size=20)
     if xlim is None: xlim = limits()[x]
     if ylim is None: ylim = limits()[y]
@@ -476,10 +487,65 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         bgs_den = density_patch(coord=contour2, xlim=xlim, ylim=ylim, plot=False, nmin=0)
         ax.contour(bgs_den.transpose(), levels=levels2, origin='lower', aspect='equal',
               extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='red', linewidths=4, alpha=0.5)
+        
+    if showmedian:
+        #compute median and percentiles
+        binx = np.linspace(xlim[0], xlim[1], 20)
+        binw = (binx[1] - binx[0])/2
+        binc, median, lower, upper = [],[],[],[]
+        
+        for num in range(len(binx)-1):
+            keepbins = (keep) & (coord[x] > binx[num]) & (coord[x] < binx[num+1])
+            
+            if np.sum(keepbins) > 0:
+                perc = np.percentile(coord[y][keepbins][np.isfinite(coord[y][keepbins])],(3,97))
+                binc.append(binx[num] + binw)
+                median.append(np.median(coord[y][keepbins]))
+                lower.append(perc[0])
+                upper.append(perc[1])
+            else:
+                continue
+        
+        ax.plot(binc, median, lw=2, c='r')
+        ax.fill_between(binc, upper, lower, facecolor='gray', alpha=0.5)
+        
+    if plothist:
+        
+        rect_histx = [left, bottom, width, 0.2]
+        rect_histy = [left, bottom, 0.2, height]
+        axHistx = fig.add_axes(rect_histx)
+        axHisty = fig.add_axes(rect_histy)
+        binsy = np.linspace(ylim[0], ylim[1], 40)
+        binsx = np.linspace(xlim[0], xlim[1], 40)
+    
+        log = False
+        N1 = axHistx.hist(coord[x][keep], bins=binsx, log=log, align='mid', color='r', lw=2, histtype='step')
+        N2 = axHisty.hist(coord[y][keep], bins=binsy, log=log, align='mid', color='r', lw=2, histtype='step', orientation='horizontal')
+        print('x max:',N1[0].max())
+        print('y max:',N2[0].max())
+        #axHistx.set_ylim(1, 700)
+        #axHisty.set_xlim(1, 700)
+        
+        axHistx.set_xlim(xlim[0], xlim[1])
+        axHisty.set_ylim(ylim[0], ylim[1])
+        axHistx.axis('off')
+        axHisty.axis('off')
+        #ax.axis('off')
+        
+        #axHistx.yaxis.set_ticks_position('right')
+        #axHisty.yaxis.set_ticks_position('right')
+        
     
     #clab = r'$N$'
     if cbar in ['horizontal', 'vertical']:
-        cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=0.15)
+        if plothist:
+            if cbar == 'horizontal': cbaxes = fig.add_axes([left, bottom-0.2, width, height*0.08])
+            elif cbar == 'vertical': cbaxes = fig.add_axes([0.95, 0.1, 0.06, 0.8])
+            cb = fig.colorbar(pos, cax=cbaxes, orientation=cbar)
+            
+            #cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=.5)
+        else:                                      
+            cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=0.15)
     elif cbar is 'panel':
         cbar_ax = fig.add_axes([0.95, 0.15, 0.02, 0.7])
         cb = fig.colorbar(pos, cax=cbar_ax)
@@ -490,6 +556,8 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
     
     if file is not None:
         fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
+        
+    return ax
         
         
 
@@ -677,7 +745,7 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             elif reg == 'decals': ydecals = systv
             elif reg == 'des': ydes = systv
             
-    if weights:
+    if (weights) & (ws is None):
         return b0, m0
     #return x, yall, ynorth, ydecals, ydes
     
