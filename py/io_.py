@@ -7,8 +7,12 @@ import astropy.io.fits as fits
 import healpy as hp
 from astropy.coordinates import SkyCoord
 import astropy.units as units
+from astropy import units as u
+from veto import veto, veto_ellip, match
 
 from cuts import getGeoCuts, getPhotCuts, get_bgs, get_bgs_sv
+
+#from QA import circular_mask_radii_func
 
 def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False):
     
@@ -133,6 +137,10 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr9dnorth = '/global/cscratch1/sd/desimpp/dr9d/north/sweep'
     sweep_dir_dr9svsouth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9sv/south/sweep'
     sweep_dir_dr9svnorth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9sv/north/sweep'
+    sweep_dir_dr9fsouth = '/global/cscratch1/sd/landriau/dr9f/south/sweep'
+    sweep_dir_dr9fnorth = '/global/cscratch1/sd/landriau/dr9f/north/sweep'
+    sweep_dir_dr9gsouth = '/global/cscratch1/sd/landriau/dr9g/south/sweep'
+    sweep_dir_dr9gnorth = '/global/cscratch1/sd/landriau/dr9g/north/sweep'
     
     if not sweep_file:
         if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
@@ -140,6 +148,10 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         elif dr == 'dr8-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
         elif dr == 'dr9sv-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
         elif dr == 'dr9sv-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9f-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9f-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9g-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9g-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
         #elif (dr is 'dr8') or (dr is 'dr9d'):
         #    if dr is 'dr8':
         #        sweep_north = sweep_dir_dr8north
@@ -513,13 +525,23 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     hpdict['issvfields'] = get_svfields(hpdict['ra'],hpdict['dec'])
     hpdict['issvfields_n'] = (hpdict['issvfields']) & (hpdict['isnorth'])
     hpdict['issvfields_s'] = (hpdict['issvfields']) & (hpdict['issouth'])
+    
+    hpdict['issvfields_fg'] = get_svfields_fg(hpdict['ra'],hpdict['dec'])
+    hpdict['issvfields_fg_n'] = (hpdict['issvfields_fg']) & (hpdict['isnorth'])
+    hpdict['issvfields_fg_s'] = (hpdict['issvfields_fg']) & (hpdict['issouth'])
+    
+    regs = ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s', 
+           'svfields_fg', 'svfields_fg_n', 'svfields_fg_s']
+    
     #hpdict['istest'] = (hpdict['ra'] > 160.) & (hpdict['ra'] < 230.) & (hpdict['dec'] > -2.) & (hpdict['dec'] < 18.)
     if log: print('regions DONE...')
 
     # areas
     hpdict['area_all']   = hpdict['bgsfracarea'].sum() * pixarea
-    for reg in ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']:
+    if log: print('area_'+'all'+' = '+'%.0f'%hpdict['area_'+'all']+' deg2')
+    for reg in regs:
         hpdict['bgsarea_'+reg]   = hpdict['bgsfracarea'][hpdict['is'+reg]].sum() * pixarea
+        if log: print('bgsarea_'+reg+' = '+'%.0f'%hpdict['bgsarea_'+reg]+' deg2')
     if log: print('areas DONE...')
     
     
@@ -575,27 +597,26 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
             if log: print('target densities in %s DONE...' %(foot))
             
         # storing mean hpdens
-        isdesi = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
+        if desifootprint: isdesi = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
+        else: isdesi = (hpdict['bgsfracarea']>0)
         for namesel in namesels.keys():
             ## south + north density
             hpdens = (hpdict['south_n'+namesel] + hpdict['north_n'+namesel] ) / (pixarea * hpdict['bgsfracarea'])
             ## split per region
-            for reg in ['all','des','decals','north', 'south', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']:
-                if (reg=='all'):
-                    hpdict['meandens_'+namesel+'_'+reg] = np.nanmean(hpdens[isdesi])
-                else:
-                    hpdict['meandens_'+namesel+'_'+reg] = np.nanmean(hpdens[(isdesi) & (hpdict['is'+reg])])
+            hpdict['meandens_'+namesel+'_'+'all'] = np.nanmean(hpdens[isdesi])
+            if log: print('meandens_'+namesel+'_'+'all'+' = '+'%.0f'%hpdict['meandens_'+namesel+'_'+'all']+' /deg2')
+            for reg in regs:
+                hpdict['meandens_'+namesel+'_'+reg] = np.nanmean(hpdens[(isdesi) & (hpdict['is'+reg])])
                 if log: print('meandens_'+namesel+'_'+reg+' = '+'%.0f'%hpdict['meandens_'+namesel+'_'+reg]+' /deg2')
             
         # storing total target density
-        isdesi = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
+        #isdesi = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
         for namesel in namesels.keys():
             ## split per region
-            for reg in ['all','des','decals','north', 'south', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']:
-                if (reg=='all'):
-                    hpdict['dens_'+namesel+'_'+reg] = (hpdict['south_n'+namesel][isdesi] + hpdict['north_n'+namesel][isdesi]).sum() / (pixarea * hpdict['bgsfracarea'][isdesi].sum())
-                else:
-                    hpdict['dens_'+namesel+'_'+reg] = (hpdict['south_n'+namesel][(isdesi) & (hpdict['is'+reg])] + hpdict['north_n'+namesel][(isdesi) & (hpdict['is'+reg])]).sum() / (pixarea * hpdict['bgsfracarea'][(isdesi) & (hpdict['is'+reg])].sum())
+            hpdict['dens_'+namesel+'_'+'all'] = (hpdict['south_n'+namesel][isdesi] + hpdict['north_n'+namesel][isdesi]).sum() / (pixarea * hpdict['bgsfracarea'][isdesi].sum())
+            if log: print('dens_'+namesel+'_'+'all'+' = '+'%.0f'%hpdict['dens_'+namesel+'_'+'all']+' /deg2')
+            for reg in regs:
+                hpdict['dens_'+namesel+'_'+reg] = (hpdict['south_n'+namesel][(isdesi) & (hpdict['is'+reg])] + hpdict['north_n'+namesel][(isdesi) & (hpdict['is'+reg])]).sum() / (pixarea * hpdict['bgsfracarea'][(isdesi) & (hpdict['is'+reg])].sum())
                 if log: print('dens_'+namesel+'_'+reg+' = '+'%.0f'%hpdict['dens_'+namesel+'_'+reg]+' /deg2')
     
     return hpdict
@@ -692,6 +713,12 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
             randoms = glob.glob(ranpath + 'randoms-inside*')
         elif (dr == 'dr9sv'):
             ranpath = '/global/cfs/cdirs/desi/target/catalogs/dr9sv/0.37.0/randoms/'
+            randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
+        elif (dr == 'dr9f'):
+            ranpath = '/project/projectdirs/desi/target/catalogs/dr9f/0.38.0/randoms/resolve/'
+            randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
+        elif (dr == 'dr9g'):
+            ranpath = '/project/projectdirs/desi/target/catalogs/dr9g/0.38.0/randoms/resolve/'
             randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
         elif (dr == 'dr9d'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9d/PRnone/randoms/'
@@ -900,6 +927,32 @@ def get_svfields(ra, dec):
         
     return keep
 
+def get_svfields_fg(ra, dec):
+    
+    svfields = {}
+
+    #svfields['s82'] = [30, 40, -7, 2.0] #90
+    #svfields['egs'] = [210, 220, 50, 55] #31
+    #svfields['g09'] = [129, 141, -2.0, 3.0] #60
+    #svfields['g12'] = [174, 186, -3.0, 2.0] #60
+    svfields['g15'] = [211, 224, -2.0, 3.0] #65
+    #svfields['overlap'] = [135, 160, 30, 35] #104
+    svfields['refnorth'] = [215, 230, 41, 46] #56
+    svfields['ages'] = [215, 220, 30, 40] #40
+    svfields['sagittarius'] = [200, 210, 5, 10] #49
+    #svfields['highebv_n'] = [140, 150, 65, 70] #19
+    svfields['highebv_s'] = [240, 245, 20, 25] #23
+    svfields['highstardens_n'] = [273, 283, 40, 45] #37
+    svfields['highstardens_s'] = [260, 270, 15, 20] #47
+    #svfields['s82_s'] = [330, 340, -2, 3] #51
+    
+    
+    keep = np.zeros_like(ra, dtype='?')
+    for key, val in zip(svfields.keys(), svfields.values()):
+        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+        
+    return keep
+
 def get_msmask(masksources):
     
     mag = np.zeros_like(masksources['RA'])
@@ -923,15 +976,175 @@ def get_msmask(masksources):
     
     return tab
 
-def gaiaAEN(inGAIA=None, size=None, G=None, AEN=None):
+def gaiaAEN(inGAIA=None, size=None, G=None, AEN=None, dr='dr8'):
     #definition for DR8 
     
-    #Stars with AEN class...
     stars_aen = np.zeros(size, dtype='?')
-    stars_aen |= ((inGAIA) & (G < 19) & (AEN < 10**(0.5))) 
-    stars_aen |= ((inGAIA) & (G >= 19) & (AEN < 10**(0.5 + 0.2*(G - 19.))))
+    if dr == 'dr8':
+        #Stars with AEN class...
+        stars_aen |= ((inGAIA) & (G < 19) & (AEN < 10**(0.5))) 
+        stars_aen |= ((inGAIA) & (G >= 19) & (AEN < 10**(0.5 + 0.2*(G - 19.))))
+    elif (dr == 'dr9sv') or (dr == 'dr9f') or (dr == 'dr9g'):
+        #Stars with AEN class...
+        stars_aen |= ((inGAIA) & (G < 18) & (AEN < 10**(0.5)))
+    else:
+        raise ValueError('%s is not a valid data release.' %(dr))
+    
     #Galaxies with AEN class...
     gal_aen = (inGAIA) & (~stars_aen)
     
     return stars_aen, gal_aen
 
+def query_catalog_mask(ra, dec, starCat, radii, nameMag='MAG_VT', diff_spikes=True, length_radii=None, widht_radii=None, return_diagnostics=False, bestfit=True, log=False):
+    '''
+    Catalog-based WISE bright star mask.
+    Input:
+    ra, dec: coordinates;
+    diff_spikes: apply diffraction spikes masking if True;
+    return_diagnostics: return disgnostic information if True;
+    Return:
+    cat_flag: array of mask value; the location is masked (contaminated) if True.
+    '''
+
+    import time
+    from QA import circular_mask_radii_func
+    
+    start = time.time()
+    
+    wisecat = starCat
+
+    w1_ab = np.array(wisecat[nameMag])
+    raW = np.array(wisecat['RA'])
+    decW = np.array(wisecat['DEC'])
+
+    w1_bins = np.arange(0, 22, 0.5)
+    
+    # only flagged by the circular mask (True if contaminated):
+    circ_flag = np.zeros(len(ra), dtype=bool)
+    # flagged by the diffraction spike mask but not the circular mask (True if contaminated):
+    ds_flag = np.zeros(len(ra), dtype=bool)
+    # flagged in the combined masks (True if contaminated):
+    cat_flag = np.zeros(len(ra), dtype=bool)
+
+    # record the magnitude of the star that causes the contamination and distance to it
+    w1_source = np.zeros(len(ra), dtype=float)
+    d2d_source = np.zeros(len(ra), dtype=float)
+
+    ra2, dec2 = map(np.copy, [ra, dec])
+    sky2 = SkyCoord(ra2*u.degree,dec2*u.degree, frame='icrs')
+
+    for index in range(len(w1_bins)-1):
+
+        mask_wise = (w1_ab>=w1_bins[index]) & (w1_ab<=w1_bins[index+1])
+        if log: print('{:.2f} < {} < {:.2f}   {} TYCHO bright stars'.format(w1_bins[index], nameMag, w1_bins[index+1], np.sum(mask_wise)))
+
+        if np.sum(mask_wise)==0:
+            continue
+    
+        # find the maximum mask radius for the magnitude bin        
+        if not diff_spikes:
+            search_radius = np.max(circular_mask_radii_func(w1_ab[mask_wise], radii, bestfit=bestfit))
+        else:
+            # Define length for diffraction spikes mask
+            x, y = np.transpose(length_radii)
+            ds_mask_length_func = interp1d(x, y, bounds_error=False, fill_value=(y[0], 0))
+            search_radius = np.max([circular_mask_radii_func(w1_ab[mask_wise], radii, bestfit=bestfit), 0.5*ds_mask_length_func(w1_ab[mask_wise])])
+
+        # Find all pairs within the search radius
+        ra1, dec1 = map(np.copy, [raW[mask_wise], decW[mask_wise]])
+        sky1 = SkyCoord(ra1*u.degree,dec1*u.degree, frame='icrs')
+        idx_wise, idx_decals, d2d, _ = sky2.search_around_sky(sky1, seplimit=search_radius*u.arcsec)
+        if log: print('%d nearby objects'%len(idx_wise))
+        
+        # convert distances to numpy array in arcsec
+        d2d = np.array(d2d.to(u.arcsec))
+
+        d_ra = (ra2[idx_decals]-ra1[idx_wise])*3600.    # in arcsec
+        d_dec = (dec2[idx_decals]-dec1[idx_wise])*3600. # in arcsec
+        ##### Convert d_ra to actual arcsecs #####
+        mask = d_ra > 180*3600
+        d_ra[mask] = d_ra[mask] - 360.*3600
+        mask = d_ra < -180*3600
+        d_ra[mask] = d_ra[mask] + 360.*3600
+        d_ra = d_ra * np.cos(dec1[idx_wise]/180*np.pi)
+        ##########################################
+
+        # circular mask
+        mask_radii = circular_mask_radii_func(w1_ab[mask_wise][idx_wise], radii, bestfit=bestfit)
+        # True means contaminated:
+        circ_contam = d2d < mask_radii
+        circ_flag[idx_decals[circ_contam]] = True
+
+        w1_source[idx_decals[circ_contam]] = w1_ab[mask_wise][idx_wise[circ_contam]]
+        d2d_source[idx_decals[circ_contam]] = d2d[circ_contam]
+
+        if diff_spikes:
+
+            ds_contam = ds_masking_func(d_ra, d_dec, d2d, w1_ab[mask_wise][idx_wise], length_radii, widht_radii)
+            ds_flag[idx_decals[ds_contam]] = True
+
+            # combine the two masks
+            cat_flag[idx_decals[circ_contam | ds_contam]] = True
+
+            w1_source[idx_decals[ds_contam]] = w1_ab[mask_wise][idx_wise[ds_contam]]
+            d2d_source[idx_decals[ds_contam]] = d2d[ds_contam]
+
+            if log: print('{} objects masked by circular mask'.format(np.sum(circ_contam)))
+            if log: print('{} additionally objects masked by diffraction spikes mask'.format(np.sum(circ_contam | ds_contam)-np.sum(circ_contam)))
+            if log: print('{} objects masked by the combined masks'.format(np.sum(circ_contam | ds_contam)))
+            if log: print()
+
+        else:
+
+            if log: print('{} objects masked'.format(np.sum(circ_contam)))
+            if log: print()
+
+    if not diff_spikes:
+        cat_flag = circ_flag
+        
+    end = time.time()
+    print('Total run time: %f sec' %(end - start))
+
+    if not return_diagnostics:
+        return cat_flag
+    else:
+        # package all the extra info
+        more_info = {}
+        more_info['w1_source'] = w1_source
+        more_info['d2d_source'] = d2d_source
+        more_info['circ_flag'] = circ_flag
+        more_info['ds_flag'] = ds_flag
+        
+    
+    return cat_flag, more_info
+
+def LSLGA_fit(LSLGA, radii=None, N=None):
+    
+    from QA import circular_mask_radii_func
+    
+    MAG = np.array(LSLGA['MAG'])
+    if radii == 'mag-rad':
+        major = circular_mask_radii_func(MAG, radii)/3600.#[degrees]
+    elif radii == 'D25':
+        major = N*LSLGA['D25']/2./60. #[degrees]
+    else:
+        raise ValueError('User a valid radii:{D25,mag-rad}')
+        
+    minor = major*LSLGA['BA']#[degrees]
+    angle = 90 - LSLGA['PA']
+    
+    return LSLGA['RA'], LSLGA['DEC'], major, minor, angle
+
+def LSLGA_veto(cat=None, LSLGA=None, radii='D25', N=1):
+    
+    import time
+    start = time.time()
+    
+    RA, DEC, major, minor, angle = LSLGA_fit(LSLGA, radii, N)
+    centers = (RA, DEC)
+    mask = veto_ellip((cat['RA'], cat['DEC']), centers, major, minor, angle)
+    
+    end = time.time()
+    print('Total run time: %f sec' %(end - start))
+    
+    return mask

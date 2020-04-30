@@ -19,7 +19,8 @@ import matplotlib.gridspec as gridspec
 from scipy.interpolate import interp1d
 from matplotlib_venn import venn3, venn3_circles
 
-from io_ import search_around
+#sys.path.insert(0, '/global/homes/q/qmxp55/DESI/bgstargets/py')
+
 
 #import raichoorlib
 #np.seterr(divide='ignore') # ignode divide by zero warnings
@@ -788,12 +789,16 @@ class linfit:
         return chi
     
 def mollweide(hpdict=None, C=None, namesel=None, reg=None, nside=256, projection=None, n=None, org=None, cm=None, 
-              fig=None, gs=None, ws=None, perc=(1, 99), title=None, cval=None):
+              fig=None, gs=None, ws=None, perc=(1, 99), title=None, cval=None, desifootprint=True):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
     
-    if reg == 'all': mainreg = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
-    else: mainreg = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0) & (hpdict['is'+reg])
+    if desifootprint: isdesi = hpdict['isdesi']
+    else: isdesi = np.ones_like(hpdict['ra'], dtype=bool)
+        
+    if reg == 'all': mainreg = (isdesi) & (hpdict['bgsfracarea']>0)
+    else: mainreg = (isdesi) & (hpdict['bgsfracarea']>0) & (hpdict['is'+reg])
+        
     ramw,decmw = get_radec_mw(hpdict['ra'],hpdict['dec'],org)
     if C is None:
         hpdens = (hpdict['south_n'+namesel] + hpdict['north_n'+namesel] ) / (pixarea * hpdict['bgsfracarea'])
@@ -955,7 +960,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
     ------
     (distance (arcsec), density) if density=True
     '''
-    
+    from io_ import search_around #if issues with this, comment it run notebook and then uncomment it and run notebook again
     # define the slit width for estimating the overdensity off diffraction spikes
     slit_width = slitw
     search_radius = SR[1]
@@ -1006,6 +1011,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
         mag_bins_len = len(mag_bins)-1
     else:
         raise ValueError('Invaid bintype. Choose bintype = 0, 1, 2')
+    print('mag_bins_len:', mag_bins_len)
     
     
     if grid is not None:
@@ -1033,8 +1039,16 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             raise ValueError('Invaid bintype. Choose bintype = 0, 1, 2')
 
         if log: print(title)
-        magminrad = circular_mask_radii_func([mag_bins[index+1]], radii_1, bestfit=radii_bestfit)[0]
-        magmaxrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+        if bintype != '1':
+            magminrad = circular_mask_radii_func([mag_bins[index+1]], radii_1, bestfit=radii_bestfit)[0]
+            magmaxrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+        else:
+            if index == 0:
+                magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+                magmaxrad = magminrad
+            else:
+                magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+                magmaxrad = circular_mask_radii_func([mag_bins[index-1]], radii_1, bestfit=radii_bestfit)[0]
 
         if not scaling:
             #get the mask radii from the mean magnitude
@@ -1042,7 +1056,8 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             if log: print('mag_mean', mag_mean)
             mask_radius = circular_mask_radii_func([mag_mean], radii_1, bestfit=radii_bestfit)[0]
             if radii_2:
-                mask_radius2 = circular_mask_radii_func([mag_mean], radii_2)[0]
+                mask_radius2 = circular_mask_radii_func([mag_mean], radii_2, bestfit=radii_bestfit)[0]
+                if log: print('mask_radius2', mask_radius2)
 
         idx2, idx1, d2d, d_ra, d_dec = search_around(ra2[mask_star], dec2[mask_star], ra1, dec1,
                                                  search_radius=annulus_max, verbose=False)
@@ -1108,7 +1123,9 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             for i in [magminrad, magmaxrad]:
                 x = i * np.sin(angle_array)
                 y = i * np.cos(angle_array)
-                ax[-1].plot(x, y, 'k', lw=2)
+                ax[-1].plot(x, y, 'k', lw=2, alpha=0.4)
+            ax[-1].plot(mask_radius * np.sin(angle_array), mask_radius * np.cos(angle_array), 'k', lw=2)
+                
             
             ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.05, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=8,color='k')
             ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.11, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=8,color='k')
@@ -1120,7 +1137,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             if radii_2:
                 x2 = mask_radius2 * np.sin(angle_array)
                 y2 = mask_radius2 * np.cos(angle_array)
-                ax[-1].plot(x2, y2, 'k', lw=1.5, linestyle='--')
+                ax[-1].plot(x2, y2, 'gold', lw=2, linestyle='-')
         else:
             angle_array = np.linspace(0, 2*np.pi, 100)
             x = 1 * np.sin(angle_array)
