@@ -14,7 +14,7 @@ from cuts import getGeoCuts, getPhotCuts, get_bgs, get_bgs_sv
 
 #from QA import circular_mask_radii_func
 
-def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False):
+def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=False):
     
     import time
     start = time.time()
@@ -29,7 +29,7 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False):
     
     if getmycat:
         for col in df.dtype.names:
-            #col = col.upper()
+            #if tractor: col = col.upper()
             if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR') & (col[:6] != 'FLUX_W'): tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
             elif col[:2] == 'MW': continue
             elif col == 'FIBERFLUX_R': tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
@@ -39,9 +39,10 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False):
         tab['FLUX_R'] = df['FLUX_R']
     else:
         for col in df.dtype.names:
-            col = col.upper()
+            #if not tractor: col = col.upper()
+            #col = col.upper()
             if col == 'BGSBITS': continue
-            tab[col] = df[col]
+            tab[col.upper()] = df[col]
             
     # create BGSBITS: bits associated to selection criteria
   
@@ -972,6 +973,29 @@ def get_msmask(masksources):
     for col in ['RA', 'DEC', 'MAG', 'REF_CAT']:
         if col == 'MAG': tab[col] = mag[keep]
         else: tab[col] = masksources[col][keep]
+    print('%i Medium Bright Stars' %(np.sum(keep)))
+    
+    return tab
+
+def get_bsmask(masksources):
+    
+    mag = np.zeros_like(masksources['RA'])
+    ingaia = (masksources['REF_CAT'] == b'G2') & (masksources['G'] <= 13)
+    intycho = (masksources['REF_CAT'] == b'T2')
+    
+    # get MAG_VT mag from Tycho
+    path = '/global/homes/q/qmxp55/DESI/matches/'
+    tycho = fitsio.read(path+'tycho2.fits')
+    idx2, idx1, d2d, d_ra, d_dec = search_around(masksources['RA'][intycho], masksources['DEC'][intycho], tycho['RA'], tycho['DEC'], search_radius=0.2)
+    mag[intycho] = tycho['MAG_VT'][idx1]
+    
+    mag[np.where(ingaia)] = masksources['G'][ingaia]
+    keep = (ingaia) | (intycho)
+    
+    tab = Table()
+    for col in ['RA', 'DEC', 'MAG', 'REF_CAT']:
+        if col == 'MAG': tab[col] = mag[keep]
+        else: tab[col] = masksources[col][keep]
     print('%i Bright Stars' %(np.sum(keep)))
     
     return tab
@@ -984,7 +1008,7 @@ def gaiaAEN(inGAIA=None, size=None, G=None, AEN=None, dr='dr8'):
         #Stars with AEN class...
         stars_aen |= ((inGAIA) & (G < 19) & (AEN < 10**(0.5))) 
         stars_aen |= ((inGAIA) & (G >= 19) & (AEN < 10**(0.5 + 0.2*(G - 19.))))
-    elif (dr == 'dr9sv') or (dr == 'dr9f') or (dr == 'dr9g'):
+    elif (dr[:3] == 'dr9') or (dr == 'dr9f') or (dr == 'dr9g'):
         #Stars with AEN class...
         stars_aen |= ((inGAIA) & (G < 18) & (AEN < 10**(0.5)))
     else:

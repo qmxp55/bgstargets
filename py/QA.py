@@ -396,7 +396,8 @@ def masking(title, submasks, details):
 def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', ylab=True, xlab=True, vline=None, 
            hline=None, fig=None, gs=None, xlim=None, ylim=None, vmin=None, vmax=None, mincnt=1, fmcline=False, 
                file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None, clab=None, 
-                   contour1=None, contour2=None, levels1=None, levels2=None, showmedian=False, plothist=False):
+                   contour1=None, contour2=None, levels1=None, levels2=None, showmedian=False, plothist=False,
+                        reduce_C_function=None):
     
     x, y = coord.keys()
     
@@ -428,7 +429,7 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         maskgal = (~masklow) & (catmask)
         
     pos = ax.hexbin(coord[x][keep], coord[y][keep], C=C, gridsize=gridsize, cmap=cmap, 
-                    vmin=vmin, vmax=vmax, bins=bins, mincnt=mincnt, alpha=0.8)
+                    vmin=vmin, vmax=vmax, bins=bins, mincnt=mincnt, alpha=0.8, reduce_C_function=reduce_C_function)
     
     dx = np.abs(xlim[1] - xlim[0])/15.
     dy = np.abs(ylim[1] - ylim[0])/15.
@@ -551,9 +552,11 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         cbar_ax = fig.add_axes([0.95, 0.15, 0.02, 0.7])
         cb = fig.colorbar(pos, cax=cbar_ax)
     else: raise ValueError('cbar is either vertical, horizontal or panel.')
+        
     if clab is None: clab = r'$N$'
-    cb.set_label(label=clab, size='large', weight='bold')
-    cb.ax.tick_params(labelsize='large')
+        
+    cb.set_label(label=clab, size=20, weight='bold')
+    cb.ax.tick_params(labelsize=16)
     
     if file is not None:
         fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
@@ -606,7 +609,7 @@ def get_systplot(systquant):
     return tmparray[tmpind,1], tmparray[tmpind,2]
 
 #
-def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False):
+def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False, cols=None, overbyreg=True, percentiles=[1,99]):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
 
@@ -654,11 +657,11 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
     axh.axes.get_yaxis().set_ticks([])
     
     ## systematics
-    cols = ['0.5','b','g','r']
+    if cols is None: cols = ['0.5','b','g','r']
     lstys = ['-', '--', '-.']
     #regs = ['all','des','decals','north']
     densmin,densmax = 0,2
-    for reg,col in zip(regs,cols):
+    for reg,col1 in zip(regs,cols):
         
         if (reg=='all'):
             isreg    = (mainreg)
@@ -668,7 +671,10 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             if (reg == regs[0]) & (len(regs) > 1): lw,alpha = 3,0.5
             else: lw,alpha = 1,1.0
                 
-        for namesel,col in zip(namesels, cols):
+        for namesel,col2 in zip(namesels, cols):
+            
+            if len(namesels) > 1: col = col2
+            else: col = col1
             
             if (namesel == namesels[0]) & (len(namesels) > 1): lw,alpha = 3,0.5
             else: lw,alpha = 1,1.0
@@ -677,6 +683,11 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             tmpdens   = hpdens[mainreg & mask]
         
             tmpsyst   = hpdicttmp[syst][isreg]
+            
+            if percentiles is not None: 
+                xlim = (np.percentile(tmpsyst[tmpsyst>0],(percentiles[0],percentiles[1])))
+                
+            
         #xlim      = tmpsyst[(tmpsyst>0) & (np.isfinite(tmpsyst))].min(), tmpsyst[(tmpsyst>0) & (np.isfinite(tmpsyst))].max()
         #xlim, _ = get_systplot(syst)
         #if clip: xlim = np.percentile(tmpsyst[(tmpsyst>0) & (np.isfinite(tmpsyst))],(1,99))
@@ -693,8 +704,10 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             systquant = tmpsyst[tmp] #systematics per region
             systdens  = tmpdens[tmp] #target density per region per bit
         
-            #systdens /= hpdicttmp['meandens_'+namesel+'_'+reg] #density/mean density per bit per region
-            systdens /= hpdicttmp['meandens_'+namesel+'_'+'all'] #density/mean density per bit overall desi footprint
+            if overbyreg: 
+                if (reg=='all'): systdens /= hpdicttmp['meandens_'+namesel+'_'+'all']
+                else: systdens /= hpdicttmp['meandens_'+namesel+'_'+reg] #density/mean density per bit per region
+            else: systdens /= hpdicttmp['meandens_'+namesel+'_'+'all'] #density/mean density per bit overall desi footprint
         
         #print(systdens)
         #print(systquant)
@@ -1100,8 +1113,10 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             annMask = np.ones(len(cat), dtype='?')
             d_ra2 = np.zeros(len(cat))
             d_dec2 = np.zeros(len(cat))
+            d2d2 = np.zeros(len(cat))
             d_ra2[idx1] = d_ra
             d_dec2[idx1] = d_dec
+            d2d2[idx1] = d2d
             if log: print(len(cat), len(d_ra2), len(d_dec2))
             #print(len(set(idx1)), len(set(idx2)))
             #print(idx1.max(), idx2.max())
@@ -1164,7 +1179,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             fig.savefig(filename+'.png', bbox_inches = 'tight', pad_inches = 0)
     
     if annulus is not None:
-        return d_ra2, d_dec2, annMask
+        return d2d2, d_ra2, d_dec2, annMask
 
 def relative_density_plot(d_ra, d_dec, d2d, search_radius, ref_density, nbins=101, return_res=False, 
                           show=True, ax=plt, d2d_arcsec=None, annulus_min=2, logDenRat=[-3,3], 
