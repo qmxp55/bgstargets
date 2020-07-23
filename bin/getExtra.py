@@ -5,7 +5,7 @@ from __future__ import print_function, division
 import numpy as np
 import os, sys
 sys.path.insert(0, '/global/homes/q/qmxp55/DESI/bgstargets/py')
-from io_ import bgsmask, get_reg, get_svfields, get_svfields_fg
+from io_ import bgsmask, get_reg, get_svfields, get_svfields_fg, get_svfields_ij
 
 import healpy as hp
 import astropy.io.fits as fits
@@ -66,11 +66,14 @@ for i in regs:
     extra[i] = reg_
     print(i, 'DONE...')
     
-extra['svfields_fg'] = get_svfields_fg(df['RA'],df['DEC'])
-print('svfields_fg', 'DONE...')
+#extra['svfields_fg'] = get_svfields_fg(df['RA'],df['DEC'])
+#print('svfields_fg', 'DONE...')
 
-extra['svfields'] = get_svfields(df['RA'],df['DEC'])
-print('svfields', 'DONE...')
+#extra['svfields_ij'] = get_svfields_ij(df['RA'],df['DEC'], survey='all')
+#print('svfields_ij', 'DONE...')
+
+#extra['svfields'] = get_svfields(df['RA'],df['DEC'])
+#print('svfields', 'DONE...')
 
 # save astropy table as npy file
 np.save(ns.OF, extra)

@@ -18,6 +18,7 @@ from PIL import Image
 import matplotlib.gridspec as gridspec
 from scipy.interpolate import interp1d
 from matplotlib_venn import venn3, venn3_circles
+from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, HPacker, VPacker
 
 #sys.path.insert(0, '/global/homes/q/qmxp55/DESI/bgstargets/py')
 
@@ -561,7 +562,10 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
     if file is not None:
         fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
         
-    return ax
+    if showmedian:
+        return ax, binc, median
+    else:
+        return ax
         
         
 
@@ -609,7 +613,7 @@ def get_systplot(systquant):
     return tmparray[tmpind,1], tmparray[tmpind,2]
 
 #
-def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False, cols=None, overbyreg=True, percentiles=[1,99]):
+def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False, cols=None, overbyreg=True, percentiles=[1,99], get_values=False):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
 
@@ -761,6 +765,10 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             
     if (weights) & (ws is None):
         return b0, m0
+    elif get_values: 
+        return plotxgrid,systv,systverr, lab
+    else:
+        return ax
     #return x, yall, ynorth, ydecals, ydes
     
 def pixcorr(x=None, y=None, nx=20, xlim=None):
@@ -1063,6 +1071,8 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
                 magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
                 magmaxrad = circular_mask_radii_func([mag_bins[index-1]], radii_1, bestfit=radii_bestfit)[0]
 
+        if log: print('MARK #1')
+            
         if not scaling:
             #get the mask radii from the mean magnitude
             mag_mean = np.mean(star[nameMag][mask_star])
@@ -1074,6 +1084,8 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
 
         idx2, idx1, d2d, d_ra, d_dec = search_around(ra2[mask_star], dec2[mask_star], ra1, dec1,
                                                  search_radius=annulus_max, verbose=False)
+        
+        if log: print('MARK #2')
 
         Nsources = len(ra2[mask_star])
         perc_sources = 100*len(ra2[mask_star])/len(ra2)
@@ -1142,8 +1154,8 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             ax[-1].plot(mask_radius * np.sin(angle_array), mask_radius * np.cos(angle_array), 'k', lw=2)
                 
             
-            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.05, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=8,color='k')
-            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.11, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=8,color='k')
+            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.05, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=10,color='k')
+            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.11, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=10,color='k')
             #ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.17, '$\eta$=%2.3g arcsec$^{-2}$' %(density_annulus), fontsize=8,color='k')
 
             ax[-1].set_xlabel(r'$\Delta$RA (arcsec)', size=20)
@@ -1157,16 +1169,26 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             angle_array = np.linspace(0, 2*np.pi, 100)
             x = 1 * np.sin(angle_array)
             y = 1 * np.cos(angle_array)
-            ax[-1].plot(x, y, 'k', lw=4)
+            ax[-1].plot(x, y, 'k', lw=2)
             
-            ax[-1].text(-SR_scaling+0.1, SR_scaling-0.2, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=10,color='k')
-            ax[-1].text(-SR_scaling+0.1, -SR_scaling+0.1, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=10,color='k')
+            ax[-1].text(-SR_scaling+0.1, SR_scaling-0.2, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=12,color='k')
+            ax[-1].text(-SR_scaling+0.1, -SR_scaling+0.1, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=12,color='k')
             #ax[-1].text(-SR_scaling+0.1, SR_scaling-0.9, '$\eta$=%2.3g deg$^{-2}$' %(density_annulus), fontsize=8,color='k')
 
-            ax[-1].set_xlabel(r'$\Delta$RA/$r_{BS}(mag)$', size=20)
-            if ((cols > 1) & (index == 0)) or (cols < 2): ax[-1].set_ylabel(r'$\Delta$DEC/$r_{BS}(mag)$', size=20)
+            ax[-1].set_xlabel(r'$\Delta$RA/$R_{BS}$', size=18)
             
-        ax[-1].set_title(title)
+            ybox1 = TextArea(r'$\Delta$DEC/$R_{BS}$, ', textprops=dict(color="k", size=18,rotation=90,ha='left',va='bottom'))
+            ybox3 = TextArea(r'$\log_{2}(\eta (\Delta R)/\bar{\eta})$', textprops=dict(color="r", size=18,rotation=90,ha='left',va='bottom'))
+
+            ybox = VPacker(children=[ybox3, ybox1],align="bottom", pad=0, sep=5)
+
+            anchored_ybox = AnchoredOffsetbox(loc=8, child=ybox, pad=0., frameon=False, bbox_to_anchor=(-0.08, 0.25), 
+                                              bbox_transform=ax[-1].transAxes, borderpad=0.)
+
+            #if ((cols > 1) & (index == 0)) or (cols < 2): ax[-1].set_ylabel(r'$\Delta$DEC/$R_{BS}$', size=18)
+            if ((cols > 1) & (index == 0)) or (cols < 2): ax[-1].add_artist(anchored_ybox)
+            
+        ax[-1].set_title(title, size=18)
         ax[-1].axvline(0, ls='--', c='k')
         ax[-1].axhline(0, ls='--', c='k')
         if annulus is not None:
@@ -1274,14 +1296,15 @@ def relative_density_plot(d_ra, d_dec, d2d, search_radius, ref_density, nbins=10
     #ax.colorbar(fraction=0.046, pad=0.04)
     cb = fig.colorbar(img, fraction=0.046, pad=0.04)
     
-    cb.set_label(label=r'$\log_{2}(\eta_{pix}/\eta_{tot})$', size='large', weight='bold')
-    cb.ax.tick_params(labelsize='large')
+    cb.set_label(label=r'$\log_{2}(\eta_{pix}/\bar{\eta})$', weight='bold', size=18)
+    cb.ax.tick_params(labelsize=15)
+    ax.tick_params(axis='both', which='major', labelsize=15)
     
     #ax.plot(np.array(dpx), dpy, lw=2.5, color='green')
-    ax.plot(np.array(dpx2), dpy2, lw=2.5, color='red')
+    ax.plot(np.array(dpx2), dpy2, lw=2, color='darkred')
     
     # find the max, min of density ratio profile for distances > 1
-    ax.text(1*search_radius/10., search_radius - 2*search_radius/30, '$max(\eta(\Delta r)/\eta, r>%i)=%2.3g$' %(maglimrad, 2**(dmax)), fontsize=10,color='k')
+    ax.text(1*search_radius/10., search_radius - 2*search_radius/30, '$max(\eta(\Delta R)/\eta, r>%i)=%2.3g$' %(maglimrad, 2**(dmax)), fontsize=14,color='k')
     #ax.text(4*search_radius/10., search_radius - 4*search_radius/30, '$min(\eta(\delta r)/\eta)=%2.3g$' %(2**(dmin)), fontsize=10,color='k')
     
     ax.set_ylim(-search_radius, search_radius)

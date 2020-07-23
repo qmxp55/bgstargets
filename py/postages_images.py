@@ -5,9 +5,9 @@ import random
 
 import bokeh.plotting as bk
 from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, ImageURL, CustomJS, Span, OpenURL, TapTool, Panel, Tabs
+from bokeh.models import ColumnDataSource, ImageURL, CustomJS, Span, OpenURL, TapTool, Panel, Tabs, Div
 from bokeh.models.widgets import CheckboxGroup, CheckboxButtonGroup, RadioGroup
-from bokeh.layouts import gridplot, row, column
+from bokeh.layouts import gridplot, row, column, WidgetBox
 from bokeh.io import curdoc, show
 
 
@@ -81,7 +81,9 @@ def disttopix(D, scale):
     return dpix
 
 
-def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmltitle='page', veto=None, grid=[2,2], m=4, radius=4/3600, comparison=False):
+def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmltitle='page', veto=None, grid=[2,2], m=4, 
+                      radius=4/3600, comparison=None, layer_list=None, title=None, tab=False, tab_title=None, main_text=None,
+                         buttons_text=None):
     
     if notebook: bk.output_notebook()
     if savefile is not None:
@@ -94,6 +96,8 @@ def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmlt
     sources = []
     layers = []
     tests = []
+    
+    if comparison is not None: a, b = comparison[0], comparison[1]
     
     RA, DEC = coord[0], coord[1]
     
@@ -109,7 +113,9 @@ def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmlt
 
     idx_list = random.sample(list(idx), rows*cols)
     
-    layer_list = ['dr9f-south', 'dr9f-south-model', 'dr9f-south-resid', 'dr9g-south', 'dr9g-south-model', 'dr9g-south-resid',
+    if layer_list is None:
+    
+        layer_list = ['dr9f-south', 'dr9f-south-model', 'dr9f-south-resid', 'dr9g-south', 'dr9g-south-model', 'dr9g-south-resid',
                  'dr9f-north', 'dr9f-north-model', 'dr9f-north-resid', 'dr9g-north', 'dr9g-north-model', 'dr9g-north-resid']
 
 #figlist = [figure(title='Figure '+str(i),plot_width=100,plot_height=100) for i in range(N)]
@@ -128,12 +134,12 @@ def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmlt
             mask = (RA > ramin + dra) & (RA < ramax - dra) & (DEC > decmin + ddec) & (DEC < decmax - ddec)
 
 
-            if comparison:
+            if comparison is not None:
                 
                 TOOLTIPS = []
                 for i in ['RA', 'DEC', 'morph', 'r', 'g', 'z', 'refcat']:
-                    TOOLTIPS.append((i+'_g', '@'+i+'_g'))
-                    TOOLTIPS.append((i+'_f', '@'+i+'_f'))
+                    TOOLTIPS.append((i+'_b', '@'+i+'_b'))
+                    TOOLTIPS.append((i+'_a', '@'+i+'_a'))
                 
             else:
                 
@@ -152,6 +158,7 @@ def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmlt
             p = figure(plot_width=size, plot_height=size, tooltips=TOOLTIPS, tools="tap")
             p.axis.visible = False
             p.min_border = 0
+            #if title is not None: p.title.text = title
 
             layers2 = []
             for layer in layer_list:
@@ -174,18 +181,18 @@ def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmlt
 
                 ravpix, decvpix = coordtopix_2(center=[RAidx, DECidx], coord=[RA[(mask) & (val)], DEC[(mask) & (val)]], size=size, scale=scale)
 
-                if comparison:
+                if comparison is not None:
                     
                     sourceCirc = ColumnDataSource(data=dict(
                         x=ravpix,
                         y=decvpix,
-                        r_g=cat['RMAG_g'][(mask) & (val)], r_f=cat['RMAG_f'][(mask) & (val)],
-                        g_g=cat['GMAG_g'][(mask) & (val)], g_f=cat['GMAG_f'][(mask) & (val)],
-                        z_g=cat['ZMAG_g'][(mask) & (val)], z_f=cat['ZMAG_f'][(mask) & (val)],
-                        morph_g=cat['TYPE_g'][(mask) & (val)], morph_f=cat['TYPE_f'][(mask) & (val)],
-                        refcat_g=cat['REF_CAT_g'][(mask) & (val)], refcat_f=cat['REF_CAT_f'][(mask) & (val)],
-                        RA_g=cat['RA_g'][(mask) & (val)], RA_f=cat['RA_f'][(mask) & (val)],
-                        DEC_g=cat['DEC_g'][(mask) & (val)], DEC_f=cat['DEC_f'][(mask) & (val)]
+                        r_b=cat['RMAG_%s' %(b)][(mask) & (val)], r_a=cat['RMAG_%s' %(a)][(mask) & (val)],
+                        g_b=cat['GMAG_%s' %(b)][(mask) & (val)], g_a=cat['GMAG_%s' %(a)][(mask) & (val)],
+                        z_b=cat['ZMAG_%s' %(b)][(mask) & (val)], z_a=cat['ZMAG_%s' %(a)][(mask) & (val)],
+                        morph_b=cat['TYPE_%s' %(b)][(mask) & (val)], morph_a=cat['TYPE_%s' %(a)][(mask) & (val)],
+                        refcat_b=cat['REF_CAT_%s' %(b)][(mask) & (val)], refcat_a=cat['REF_CAT_%s' %(a)][(mask) & (val)],
+                        RA_b=cat['RA_%s' %(b)][(mask) & (val)], RA_a=cat['RA_%s' %(a)][(mask) & (val)],
+                        DEC_b=cat['DEC_%s' %(b)][(mask) & (val)], DEC_a=cat['DEC_%s' %(a)][(mask) & (val)]
                         ))
                     
                 else:
@@ -262,8 +269,23 @@ def html_postages(cat, coord=None, idx=None, notebook=True, savefile=None, htmlt
     
     #show(row(grid,checkbox))
     #show(tabs)
-    layout = column(row(radio,checkbox),grid)
-    show(layout)
+    
+    # Put controls in a single element
+    controls = WidgetBox(radio, checkbox, sizing_mode='scale_height')
+    
+    if title is None: title = '--'
+    if main_text is None: main_text = '...'
+    if buttons_text is None: buttons_text = '...'
+    
+    #layout = column(row(radio,checkbox),grid)
+    layout = column(Div(text='<h1>%s</h1>' %(title)), Div(text='<h3>%s</h3>' %(main_text)), row(column(Div(text='<h2>%s</h2>' %(buttons_text)), controls), grid))
+    if tab:
+        # Make a tab with the layout 
+        tab = Panel(child=layout, title = tab_title)
+        return tab
+
+    else:
+        show(layout)
     
     #return iterable, checkbox_code, callback, iterable2, radiogroup_code, callback2
 

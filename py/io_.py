@@ -142,6 +142,10 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr9fnorth = '/global/cscratch1/sd/landriau/dr9f/north/sweep'
     sweep_dir_dr9gsouth = '/global/cscratch1/sd/landriau/dr9g/south/sweep'
     sweep_dir_dr9gnorth = '/global/cscratch1/sd/landriau/dr9g/north/sweep'
+    sweep_dir_dr9isouth = '/global/cscratch1/sd/adamyers/dr9i/south/sweep'
+    sweep_dir_dr9inorth = '/global/cscratch1/sd/adamyers/dr9i/north/sweep'
+    sweep_dir_dr9jsouth = '/global/cscratch1/sd/adamyers/dr9j/south/sweep'
+    sweep_dir_dr9jnorth = '/global/cscratch1/sd/adamyers/dr9j/north/sweep'
     
     if not sweep_file:
         if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
@@ -153,6 +157,11 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         elif dr == 'dr9f-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
         elif dr == 'dr9g-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
         elif dr == 'dr9g-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9i-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9isouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9i-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9inorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9j-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        elif dr == 'dr9j-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+            
         #elif (dr is 'dr8') or (dr is 'dr9d'):
         #    if dr is 'dr8':
         #        sweep_north = sweep_dir_dr8north
@@ -264,7 +273,8 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
                     'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
                         'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
                              'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                   'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z']
+                                   'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
+                                       'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
     
     #sweepfiles = sweepfiles[:2]
     
@@ -523,6 +533,7 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     hpdict['isdecals'] = (hpdict['issouth']) & (~hpdict['isdes'])
     hpdict['issouth_n'] = (hpdict['issouth']) & (hpdict['galb']>0)
     hpdict['issouth_s'] = (hpdict['issouth']) & (hpdict['galb']<0)
+    
     hpdict['issvfields'] = get_svfields(hpdict['ra'],hpdict['dec'])
     hpdict['issvfields_n'] = (hpdict['issvfields']) & (hpdict['isnorth'])
     hpdict['issvfields_s'] = (hpdict['issvfields']) & (hpdict['issouth'])
@@ -531,8 +542,12 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     hpdict['issvfields_fg_n'] = (hpdict['issvfields_fg']) & (hpdict['isnorth'])
     hpdict['issvfields_fg_s'] = (hpdict['issvfields_fg']) & (hpdict['issouth'])
     
+    hpdict['issvfields_ij'] = get_svfields_ij(hpdict['ra'],hpdict['dec'], survey='all')
+    hpdict['issvfields_ij_n'] = (hpdict['issvfields_ij']) & (hpdict['isnorth'])
+    hpdict['issvfields_ij_s'] = (hpdict['issvfields_ij']) & (hpdict['issouth'])
+    
     regs = ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s', 
-           'svfields_fg', 'svfields_fg_n', 'svfields_fg_s']
+           'svfields_fg', 'svfields_fg_n', 'svfields_fg_s', 'svfields_ij', 'svfields_ij_n', 'svfields_ij_s']
     
     #hpdict['istest'] = (hpdict['ra'] > 160.) & (hpdict['ra'] < 230.) & (hpdict['dec'] > -2.) & (hpdict['dec'] < 18.)
     if log: print('regions DONE...')
@@ -721,6 +736,12 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
         elif (dr == 'dr9g'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9g/0.38.0/randoms/resolve/'
             randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
+        elif (dr == 'dr9i'):
+            ranpath = '/project/projectdirs/desi/target/catalogs/dr9i/0.40.0/randoms/resolve/'
+            randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
+        elif (dr == 'dr9j'):
+            ranpath = '/project/projectdirs/desi/target/catalogs/dr9j/0.40.0/randoms/resolve/'
+            randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
         elif (dr == 'dr9d'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9d/PRnone/randoms/'
             random_south = ranpath + 'dr9d-south/' + 'randoms-dr9-hp-X-1.fits'
@@ -767,39 +788,6 @@ def convert_size(size_bytes):
     size = round(size_bytes / power, 2) 
     return "%s %s" % (size, size_name[i])
 
-# copied from https://github.com/rongpu/desi-examples/blob/master/bright_star_contamination/match_coord.py
-def search_around(ra1, dec1, ra2, dec2, search_radius=1., verbose=True):
-	'''
-	Using the astropy.coordinates.search_around_sky module to find all pairs within
-	some search radius.
-	Inputs: 
-	RA and Dec of two catalogs;
-	search_radius (arcsec);
-	Outputs: 
-		idx1, idx2: indices of matched objects in the two catalogs;
-		d2d: angular distances (arcsec);
-		d_ra, d_dec: the differences in RA and Dec (arcsec); 
-	'''
-	# protect the global variables from being changed by np.sort
-	ra1, dec1, ra2, dec2 = map(np.copy, [ra1, dec1, ra2, dec2])
-	# Matching catalogs
-	sky1 = SkyCoord(ra1*units.degree,dec1*units.degree, frame='icrs')
-	sky2 = SkyCoord(ra2*units.degree,dec2*units.degree, frame='icrs')
-	idx1, idx2, d2d, d3d = sky2.search_around_sky(sky1, seplimit=search_radius*units.arcsec)
-	if verbose:
-		print('%d nearby objects'%len(idx1))
-	# convert distances to numpy array in arcsec
-	d2d   = np.array(d2d.to(units.arcsec))
-	d_ra  = (ra2[idx2]-ra1[idx1])*3600.    # in arcsec
-	d_dec = (dec2[idx2]-dec1[idx1])*3600. # in arcsec
-	##### Convert d_ra to actual arcsecs #####
-	mask       = d_ra > 180*3600
-	d_ra[mask] = d_ra[mask] - 360.*3600
-	mask       = d_ra < -180*3600
-	d_ra[mask] = d_ra[mask] + 360.*3600
-	d_ra       = d_ra * np.cos(dec1[idx1]/180*np.pi)
-	##########################################
-	return idx1, idx2, d2d, d_ra, d_dec
 
 # https://desi.lbl.gov/svn/docs/technotes/targeting/target-truth/trunk/python/match_coord.py
 # slightly edited (plot_q and keep_all_pairs removed; u => units)
@@ -885,6 +873,32 @@ def match_coord(ra1, dec1, ra2, dec2, search_radius=1., nthneighbor=1, verbose=T
 	##########################################
 	return np.array(t1['id']), np.array(t2['id']), np.array(t2['d2d']), np.array(d_ra), np.array(d_dec)
 
+# copied from https://github.com/rongpu/desi-examples/blob/master/bright_star_contamination/match_coord.py
+def search_around(ra1, dec1, ra2, dec2, search_radius=1., verbose=True):
+
+    ra1, dec1, ra2, dec2 = map(np.copy, [ra1, dec1, ra2, dec2])
+
+    sky1 = SkyCoord(ra1*u.degree,dec1*u.degree, frame='icrs')
+    sky2 = SkyCoord(ra2*units.degree,dec2*units.degree, frame='icrs')
+    idx1, idx2, d2d, d3d = sky2.search_around_sky(sky1, seplimit=search_radius*units.arcsec)
+
+    if verbose:
+        print('%d nearby objects'%len(idx1))
+    # convert distances to numpy array in arcsec
+    d2d   = np.array(d2d.to(units.arcsec))
+    d_ra  = (ra2[idx2]-ra1[idx1])*3600.    # in arcsec
+    d_dec = (dec2[idx2]-dec1[idx1])*3600. # in arcsec
+    ##### Convert d_ra to actual arcsecs #####
+    mask       = d_ra > 180*3600
+    d_ra[mask] = d_ra[mask] - 360.*3600
+    mask       = d_ra < -180*3600
+    d_ra[mask] = d_ra[mask] + 360.*3600
+    d_ra       = d_ra * np.cos(dec1[idx1]/180*np.pi)
+    ##########################################
+
+    return idx1, idx2, d2d, d_ra, d_dec
+
+
 def get_isdes(ra,dec):
 	hdu = fits.open('/global/cscratch1/sd/raichoor/desits/des_hpmask.fits')
 	nside,nest = hdu[1].header['HPXNSIDE'],hdu[1].header['HPXNEST']
@@ -947,6 +961,28 @@ def get_svfields_fg(ra, dec):
     svfields['highstardens_s'] = [260, 270, 15, 20] #47
     #svfields['s82_s'] = [330, 340, -2, 3] #51
     
+    
+    keep = np.zeros_like(ra, dtype='?')
+    for key, val in zip(svfields.keys(), svfields.values()):
+        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+        
+    return keep
+
+def get_svfields_ij(ra, dec, survey='all'):
+    
+    if survey == 'south':
+        svfields = {}
+        svfields['g15'] = [211, 224, -2.0, 3.0] #65
+     
+    if survey == 'north':
+        svfields = {}
+        svfields['refnorth'] = [215.2, 229.8, 41, 46] #56
+        
+    if survey == 'all':
+        svfields = {}
+        svfields['refnorth'] = [215.2, 229.8, 41, 46] #56
+        svfields['g15'] = [211, 224, -2.0, 3.0] #65
+
     
     keep = np.zeros_like(ra, dtype='?')
     for key, val in zip(svfields.keys(), svfields.values()):
