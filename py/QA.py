@@ -1442,6 +1442,35 @@ def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None, colors=No
 
     plt.show()
     
+    
+from matplotlib_venn import venn2, venn2_circles
+
+def plot_venn2(A,B,area, title=None, labels=None, savefile=None):
+
+    fig = plt.figure(figsize=(10,10))
+
+    sf = 2
+    #area = hpdict0['bgsarea_'+survey]
+
+    a = A
+    b = B
+    c = (a) & (b)
+
+    a1 = round(((np.sum(a) - np.sum(c))/area), sf)
+    b1 = round(((np.sum(b) - np.sum(c))/area), sf)
+    c1 = round(np.sum(c)/area, sf)
+
+    if title is not None: plt.title(title, size=18)
+    if labels is None: labels = ('group A', 'group B')
+
+    venn2([a1, b1, c1], set_labels = labels)
+    #venn2([a1, b1, c1])
+    c=venn2_circles([a1, b1, c1], linestyle='solid', linewidth=1, color="k")
+
+    #filename = '%s/%s' %(pathdir, savefile)
+    if savefile is not None:
+        fig.savefig(savefile+'.png', bbox_inches = 'tight', pad_inches = 0)
+    
 
 def scatterplot(coord=None, catmask=None, xlim=None, ylim=None, title=None, fig=None, gs=None, n=None, ylab=True, 
                 xlab=True, hline=None, vline=None, fmcline=False, file=None, contour1=None):

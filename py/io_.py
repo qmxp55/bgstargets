@@ -130,6 +130,26 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     elif (len(namelab) > 0) & (patch is not None): sweep_file_name = '%s_sweep_%s' %(dr, '_'.join(namelab))
     else: sweep_file_name = '%s_sweep_whole' %(dr)
         
+        
+    if dr[:4] == 'dr9k':
+        
+        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
+                                           'SHAPE_E1', 'SHAPE_E1_IVAR']
+    else:
+        
+        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                        'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                            'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                                'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                     'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                           'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
+                                               'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
+        
     sweep_file = os.path.isfile(sweepdir+sweep_file_name+'.npy')
     sweep_dir_dr7 = os.path.join('/global/project/projectdirs/cosmo/data/legacysurvey/','dr7', 'sweep', '7.1')
     sweep_dir_dr8south = '/global/project/projectdirs/cosmo/data/legacysurvey/dr8/south/sweep/8.0'
@@ -146,21 +166,25 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr9inorth = '/global/cscratch1/sd/adamyers/dr9i/north/sweep'
     sweep_dir_dr9jsouth = '/global/cscratch1/sd/adamyers/dr9j/south/sweep'
     sweep_dir_dr9jnorth = '/global/cscratch1/sd/adamyers/dr9j/north/sweep'
+    sweep_dir_dr9ksouth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9k/south/sweep'
+    sweep_dir_dr9knorth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9k/north/sweep'
     
     if not sweep_file:
-        if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr8-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr8-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9sv-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9sv-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9f-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9f-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9g-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9g-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9i-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9isouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9i-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9inorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9j-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
-        elif dr == 'dr9j-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt)
+        if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr8-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr8-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr8north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9sv-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9sv-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9svnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9f-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9f-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9fnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9g-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9g-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9gnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9i-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9isouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9i-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9inorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9j-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jsouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9j-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9k-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9ksouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9k-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9knorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
             
         #elif (dr is 'dr8') or (dr is 'dr9d'):
         #    if dr is 'dr8':
@@ -263,18 +287,21 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     else: return np.load(os.path.abspath(sweepdir+sweep_file_name+'.npy'))
     
     
-def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='1'):
+def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='1', cols=None):
     '''Main function to extract the data from the SWEEPS'''
     
     j = 0
+    
     sweepfiles = sorted(glob.glob(os.path.join(sweep_dir, '*.fits')))
-    cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
-                'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
-                    'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
-                        'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
-                             'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                   'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
-                                       'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
+    
+    if cols is None:
+        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
+                                           'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
     
     #sweepfiles = sweepfiles[:2]
     
@@ -389,7 +416,10 @@ def bgsmask():
             'QC_FM': 11,
             'QC_FI': 12,
             'QC_FF': 13,
-            'QC_IVAR': 14,
+            'QC_FM2': 14,
+            'QC_FI2': 15,
+            'QC_FF2': 16,
+            'QC_IVAR': 17,
             'bgs_any': 20,
             'bgs_bright': 21,
             'bgs_faint': 22,
@@ -742,6 +772,9 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
         elif (dr == 'dr9j'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9j/0.40.0/randoms/resolve/'
             randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
+        elif (dr == 'dr9k'):
+            ranpath = '/global/cfs/cdirs/desi/target/catalogs/dr9k/0.40.0/randoms/resolve/'
+            randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
         elif (dr == 'dr9d'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9d/PRnone/randoms/'
             random_south = ranpath + 'dr9d-south/' + 'randoms-dr9-hp-X-1.fits'
@@ -990,6 +1023,43 @@ def get_svfields_ij(ra, dec, survey='all'):
         
     return keep
 
+
+def get_svfields_k(ra, dec, survey='all'):
+    
+    if survey == 'south':
+        svfields = {}
+        svfields['g15'] = [211, 224, -2.0, 3.0] #65
+        svfields['sagittarius'] = [200, 210, 5, 10] #49
+        svfields['highebv_s'] = [240, 245, 20, 25] #23
+        svfields['highstardens_s'] = [260, 268, 15, 20] #47
+     
+    if survey == 'north':
+        svfields = {}
+        svfields['ages'] = [216, 220, 30, 40] #40
+        svfields['refnorth'] = [215, 230, 41, 46] #56
+        svfields['egs'] = [210, 220, 50, 55] #31
+        svfields['highstardens_n'] = [273, 280, 40, 45] #37
+        
+    if survey == 'all':
+        svfields = {}
+        #south
+        svfields['g15'] = [211, 224, -2.0, 3.0] #65
+        svfields['sagittarius'] = [200, 210, 5, 10] #49
+        svfields['highebv_s'] = [240, 245, 20, 25] #23
+        svfields['highstardens_s'] = [260, 268, 15, 20] #47
+        #north
+        svfields['ages'] = [216, 220, 30, 40] #40
+        svfields['refnorth'] = [215, 230, 41, 46] #56
+        svfields['egs'] = [210, 220, 50, 55] #31
+        svfields['highstardens_n'] = [273, 280, 40, 45] #37
+
+    
+    keep = np.zeros_like(ra, dtype='?')
+    for key, val in zip(svfields.keys(), svfields.values()):
+        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+        
+    return keep
+
 def get_msmask(masksources):
     
     mag = np.zeros_like(masksources['RA'])
@@ -1208,3 +1278,65 @@ def LSLGA_veto(cat=None, LSLGA=None, radii='D25', N=1):
     print('Total run time: %f sec' %(end - start))
     
     return mask
+
+
+def match_gama(cat=None, gama=None):
+    
+    # matching LS with gama stars and galaxies
+    idx20, idx10, d2d0, d_ra0, d_dec0 = match_coord(cat['RA'], cat['DEC'], 
+                                                                gama['RA'], gama['DEC'], search_radius=1)
+
+    # LS DR8 matched with gama
+    cat_gama = np.zeros_like(cat['RA'], dtype='?') #LS that match with gama
+    gama_cat = np.zeros_like(gama['RA'], dtype='?') #gama that match with LS
+    cat_z = np.full_like(cat['RA'], -1) #z from gama
+
+    cat_gama[idx20.tolist()] = True
+    gama_cat[idx10.tolist()] = True
+    cat_z[idx20.tolist()] = gama['Z'][idx10]
+    
+    return cat_gama, gama_cat, cat_z
+
+
+def gama_assess(cat=None, rmaglab=None, match=None, gamagal=None, mask=None, cumu=True):
+    
+    if mask is None: mask = np.ones_like(cat['RA'], dtype=bool)
+    if gamagal is None: gamagal = np.ones_like(cat['RA'], dtype=bool)
+        
+    rmagl = []
+    Ncomp = []
+    Ncont = []
+    Nincomp = []
+    Ngama_ls = []
+    Ntot = []
+
+    #for i in np.linspace(15, 20, 30):
+    rmags = np.linspace(12, 20.2, 40)
+    bins = (rmags[1] - rmags[0])/2
+    for num, i in enumerate(rmags[:-1]):
+    
+        if cumu:
+            rlim = (cat[rmaglab] < i)
+            keep = (rlim) & (mask)
+            keepall = (match) & (rlim) 
+            Ntot_ = np.sum((rlim) & (mask))
+            rmagl.append(i)
+            #NgamaGal.append(np.sum((cat['RMAG'] < i) & ))
+        else:
+            rlim = (cat[rmaglab] < rmags[num+1]) & (cat[rmaglab] > rmags[num])
+            keep = (rlim) & (mask)
+            Ntot_ = np.sum((rlim) & (mask))
+            keepall = (match) & (rlim)
+            rmagl.append(i+bins)
+    
+        Ncomp.append(np.sum((keep) & (match) & (gamagal))) #completeness
+        Ncont.append(np.sum((keep) & (~match))) #contamination
+        Nincomp.append(np.sum((rlim) & (~mask) & (match) & (gamagal))) #incompleteness
+        
+        if np.sum((keepall) & (gamagal)) == 0:
+            Ngama_ls.append(np.nan)
+        else:
+            Ngama_ls.append(np.sum((keepall) & (gamagal))) #gama galaxies
+        Ntot.append(Ntot_) #total; BGS if mask=bgs
+        
+    return np.array(rmagl), np.array(Ncomp), np.array(Ncont), np.array(Nincomp), np.array(Ngama_ls), np.array(Ntot)

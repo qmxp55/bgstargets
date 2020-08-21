@@ -5,7 +5,7 @@ source deactivate
 conda deactivate 
 conda activate DESI_BGS_omar
 
-export DR='dr8'
+export DR='dr9k'
 export outdir='/global/cscratch1/sd/qmxp55/bgstargets_output'
 export version='0.1.0'
 export Nran='3'
@@ -30,11 +30,11 @@ mkdir -p ${outdir}/${DR}/${version}
 #------------------------------------------------
 #run below to generate catalogue and randoms with rmag limit of 21
  
-python bin/getSweeps.py -dr ${DR}-north -OF ${outdir}/${DR}/
+#python bin/getSweeps.py -dr ${DR}-north -OF ${outdir}/${DR}/
 python bin/getBGSBITS.py -IF ${outdir}/${DR}/${DR}-north_sweep_whole_r21.0.npy -OF ${outdir}/${DR}/${version}/bgstargets-north.npy
 #python bin/getExtra.py -IF ${outdir}/${DR}/${version}/bgstargets-north.npy -OF ${outdir}/${DR}/${version}/extra-north_n256.npy
 
-python bin/getSweeps.py -dr ${DR}-south -OF ${outdir}/${DR}/
+#python bin/getSweeps.py -dr ${DR}-south -OF ${outdir}/${DR}/
 python bin/getBGSBITS.py -IF ${outdir}/${DR}/${DR}-south_sweep_whole_r21.0.npy -OF ${outdir}/${DR}/${version}/bgstargets-south.npy
 #python bin/getExtra.py -IF ${outdir}/${DR}/${version}/bgstargets-south.npy -OF ${outdir}/${DR}/${version}/extra-south_n256.npy
 

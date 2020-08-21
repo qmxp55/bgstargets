@@ -120,6 +120,23 @@ def getPhotCuts(df, mycat=False, survey='main'):
     QC_IVAR &= (df['FLUX_IVAR_R'] > 0.)  
     QC_IVAR &= (df['FLUX_IVAR_G'] > 0.)  
     QC_IVAR &= (df['FLUX_IVAR_Z'] > 0.) 
+    
+    #
+    QC_FM2 = nomask.copy()
+    QC_FM2 |= ((df['FRACMASKED_R'] < 0.4) & (df['FRACMASKED_G'] < 0.4))
+    QC_FM2 |= ((df['FRACMASKED_R'] < 0.4) & (df['FRACMASKED_Z'] < 0.4))
+    QC_FM2 |= ((df['FRACMASKED_G'] < 0.4) & (df['FRACMASKED_Z'] < 0.4))
+    
+    QC_FI2 = nomask.copy()
+    QC_FI2 |= ((df['FRACIN_R'] > 0.3) & (df['FRACIN_G'] > 0.3))
+    QC_FI2 |= ((df['FRACIN_R'] > 0.3) & (df['FRACIN_Z'] > 0.3))
+    QC_FI2 |= ((df['FRACIN_G'] > 0.3) & (df['FRACIN_Z'] > 0.3))
+    
+    QC_FF2 = nomask.copy()
+    QC_FF2 |= ((df['FRACFLUX_R'] < 5.) & (df['FRACFLUX_G'] < 5.))
+    QC_FF2 |= ((df['FRACFLUX_R'] < 5.) & (df['FRACFLUX_Z'] < 5.))
+    QC_FF2 |= ((df['FRACFLUX_G'] < 5.) & (df['FRACFLUX_Z'] < 5.))
+    
 
     
     PhotCut = {'SG':GAL | LX,
@@ -130,6 +147,9 @@ def getPhotCuts(df, mycat=False, survey='main'):
               'QC_FM':QC_FM | LX,
               'QC_FI':QC_FI | LX,
               'QC_FF':QC_FF | LX,
+              'QC_FM2':QC_FM2 | LX,
+              'QC_FI2':QC_FI2 | LX,
+              'QC_FF2':QC_FF2 | LX,
               'QC_IVAR':QC_IVAR | LX
              }
     
