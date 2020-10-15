@@ -120,6 +120,23 @@ def getPhotCuts(df, mycat=False, survey='main'):
     QC_IVAR &= (df['FLUX_IVAR_R'] > 0.)  
     QC_IVAR &= (df['FLUX_IVAR_G'] > 0.)  
     QC_IVAR &= (df['FLUX_IVAR_Z'] > 0.) 
+    
+    #
+    QC_FM2 = nomask.copy()
+    QC_FM2 |= ((df['FRACMASKED_R'] < 0.4) & (df['FRACMASKED_G'] < 0.4))
+    QC_FM2 |= ((df['FRACMASKED_R'] < 0.4) & (df['FRACMASKED_Z'] < 0.4))
+    QC_FM2 |= ((df['FRACMASKED_G'] < 0.4) & (df['FRACMASKED_Z'] < 0.4))
+    
+    QC_FI2 = nomask.copy()
+    QC_FI2 |= ((df['FRACIN_R'] > 0.3) & (df['FRACIN_G'] > 0.3))
+    QC_FI2 |= ((df['FRACIN_R'] > 0.3) & (df['FRACIN_Z'] > 0.3))
+    QC_FI2 |= ((df['FRACIN_G'] > 0.3) & (df['FRACIN_Z'] > 0.3))
+    
+    QC_FF2 = nomask.copy()
+    QC_FF2 |= ((df['FRACFLUX_R'] < 5.) & (df['FRACFLUX_G'] < 5.))
+    QC_FF2 |= ((df['FRACFLUX_R'] < 5.) & (df['FRACFLUX_Z'] < 5.))
+    QC_FF2 |= ((df['FRACFLUX_G'] < 5.) & (df['FRACFLUX_Z'] < 5.))
+    
 
     
     PhotCut = {'SG':GAL | LX,
@@ -130,6 +147,9 @@ def getPhotCuts(df, mycat=False, survey='main'):
               'QC_FM':QC_FM | LX,
               'QC_FI':QC_FI | LX,
               'QC_FF':QC_FF | LX,
+              'QC_FM2':QC_FM2 | LX,
+              'QC_FI2':QC_FI2 | LX,
+              'QC_FF2':QC_FF2 | LX,
               'QC_IVAR':QC_IVAR | LX
              }
     
@@ -151,7 +171,7 @@ def get_bgs(df, mycat=False):
     bgscuts = geocuts
     bgscuts.update(photcuts)
     
-    bgslist = ['BS', 'LG', 'GC', 'nobs', 'SG', 'FMC2', 'CC', 'QC_FM', 'QC_FI', 'QC_FF', 'QC_IVAR']
+    bgslist = ['BS', 'LG', 'GC', 'nobs', 'SG', 'FMC2', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
     bgs = np.ones_like(df['RA'], dtype='?')
     bgs_bright = bgs.copy()
     bgs_faint = bgs.copy()
@@ -182,8 +202,8 @@ def get_bgs_sv(df, mycat=False):
     bgscuts = geocuts
     bgscuts.update(photcuts)
     
-    bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF', 'QC_IVAR']
-    lowlist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF', 'QC_IVAR']
+    bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
+    #lowlist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
     bgs_sv = np.ones_like(df['RA'], dtype='?')
     bgs_sv_bright = bgs_sv.copy()
     bgs_sv_faint = bgs_sv.copy()
@@ -229,3 +249,17 @@ def get_galaxies_sv(gaiagmag, fluxr, psflike):
     GAIA_GAL &= ((Grr  >  0.6) | (gaiagmag == 0)) | ((Grr < 0.6) & (~psflike) & (gaiagmag != 0))
     
     return GAIA_GAL
+
+def bgsbut(bgsbits=None, rmag=None, pop=None, bgsmask=None, rlimit=20):
+    
+    bgslist = ['BS', 'LG', 'GC', 'nobs', 'SG', 'FMC2', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
+    if pop is not None:
+        [bgslist.remove(i) for i in pop]
+    
+    bgsbut = np.ones_like(rmag, dtype=bool)
+    for key in bgslist:
+        keep = ((bgsbits & 2**(bgsmask[key])) != 0)
+        bgsbut &= keep
+    bgsbut &= rmag < rlimit
+    
+    return bgsbut

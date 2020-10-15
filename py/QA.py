@@ -764,7 +764,7 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             elif reg == 'des': ydes = systv
             
     if (weights) & (ws is None):
-        return b0, m0
+        return b0, m0, [plotxgrid,systv,systverr], [plotxgrid_w,systv_w,systverr_w]
     elif get_values: 
         return plotxgrid,systv,systverr, lab
     else:
@@ -810,7 +810,7 @@ class linfit:
         return chi
     
 def mollweide(hpdict=None, C=None, namesel=None, reg=None, nside=256, projection=None, n=None, org=None, cm=None, 
-              fig=None, gs=None, ws=None, perc=(1, 99), title=None, cval=None, desifootprint=True):
+              fig=None, gs=None, ws=None, perc=(1, 99), title=None, cval=None, desifootprint=True, dr='drx'):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
     
@@ -824,7 +824,7 @@ def mollweide(hpdict=None, C=None, namesel=None, reg=None, nside=256, projection
     if C is None:
         hpdens = (hpdict['south_n'+namesel] + hpdict['north_n'+namesel] ) / (pixarea * hpdict['bgsfracarea'])
         hpmean = hpdict['meandens_'+namesel+'_'+reg]
-        clab      = 'LS dr8/'+namesel+r' density [deg$^{-2}$]'
+        clab      = 'LS %s/%s density [deg$^{-2}$]' %(dr, namesel)
     else:
         key = list(C.keys())[0]
         val = C[key]
@@ -1202,6 +1202,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
     
     if annulus is not None:
         return d2d2, d_ra2, d_dec2, annMask
+    
 
 def relative_density_plot(d_ra, d_dec, d2d, search_radius, ref_density, nbins=101, return_res=False, 
                           show=True, ax=plt, d2d_arcsec=None, annulus_min=2, logDenRat=[-3,3], 

@@ -17,8 +17,11 @@ import pygraphviz as pgv
 from PIL import Image
 import matplotlib.gridspec as gridspec
 from scipy.interpolate import interp1d
+from matplotlib_venn import venn3, venn3_circles
+from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, HPacker, VPacker
 
-from io_ import search_around
+#sys.path.insert(0, '/global/homes/q/qmxp55/DESI/bgstargets/py')
+
 
 #import raichoorlib
 #np.seterr(divide='ignore') # ignode divide by zero warnings
@@ -393,11 +396,24 @@ def masking(title, submasks, details):
 
 def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', ylab=True, xlab=True, vline=None, 
            hline=None, fig=None, gs=None, xlim=None, ylim=None, vmin=None, vmax=None, mincnt=1, fmcline=False, 
-               file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None):
+               file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None, clab=None, 
+                   contour1=None, contour2=None, levels1=None, levels2=None, showmedian=False, plothist=False,
+                        reduce_C_function=None):
     
     x, y = coord.keys()
     
-    ax = fig.add_subplot(gs[n])
+    #ax = fig.add_subplot(gs[n])
+    
+    if plothist:
+        left, width = 0.1, 0.85
+        bottom, height = 0.1, 0.85
+        main = [left, bottom, width, height]
+        
+        #ax = fig.add_subplot(gs[n])
+        ax = fig.add_axes(main, gs[n])
+    else:
+        ax = fig.add_subplot(gs[n])
+    
     if title is not None: ax.set_title(r'%s' %(title), size=20)
     if xlim is None: xlim = limits()[x]
     if ylim is None: ylim = limits()[y]
@@ -414,7 +430,7 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         maskgal = (~masklow) & (catmask)
         
     pos = ax.hexbin(coord[x][keep], coord[y][keep], C=C, gridsize=gridsize, cmap=cmap, 
-                    vmin=vmin, vmax=vmax, bins=bins, mincnt=mincnt, alpha=0.8)
+                    vmin=vmin, vmax=vmax, bins=bins, mincnt=mincnt, alpha=0.8, reduce_C_function=reduce_C_function)
     
     dx = np.abs(xlim[1] - xlim[0])/15.
     dy = np.abs(ylim[1] - ylim[0])/15.
@@ -424,8 +440,8 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         if area is not None: ax.text(xlim[1]-5*dx, ylim[1]-2*dy, r'$\eta$. %.2f/deg$^2$' %(Ntot/area), size=15)
         ax.text(xlim[0]+dx, ylim[1]-dy, r'f.gal. %.2f %%' %(100 * np.sum(maskhigh)/Ntot), size=15)
         ax.text(xlim[0]+dx, ylim[0]+dy, r'f.stars. %.2f %%' %(100 * np.sum(masklow)/Ntot), size=15)
-    if ylab: ax.set_ylabel(r'%s' %(y), size=20)
-    if xlab: ax.set_xlabel(r'%s' %(x), size=20)
+    if ylab: ax.set_ylabel(r'%s' %(y), size=25)
+    if xlab: ax.set_xlabel(r'%s' %(x), size=25)
     if hline is not None: ax.axhline(hline, ls='--', lw=2, c='r')
     if vline is not None: ax.axvline(vline, ls='--', lw=2, c='r')
     if fmcline: 
@@ -463,18 +479,93 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
     ax.set_xlim(xlim[0], xlim[1])
     ax.set_ylim(ylim[0], ylim[1])
     
+    if contour1 is not None:
+        if levels1 is None: levels1 = (0, 10)
+        bgs_den = density_patch(coord=contour1, xlim=xlim, ylim=ylim, plot=False, nmin=0)
+        ax.contour(bgs_den.transpose(), levels=levels1, origin='lower', aspect='equal',
+              extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='black', linewidths=4, alpha=0.5)
+        
+    if contour2 is not None:
+        if levels2 is None: levels2 = (0, 10)
+        bgs_den = density_patch(coord=contour2, xlim=xlim, ylim=ylim, plot=False, nmin=0)
+        ax.contour(bgs_den.transpose(), levels=levels2, origin='lower', aspect='equal',
+              extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='red', linewidths=4, alpha=0.5)
+        
+    if showmedian:
+        #compute median and percentiles
+        binx = np.linspace(xlim[0], xlim[1], 20)
+        binw = (binx[1] - binx[0])/2
+        binc, median, lower, upper = [],[],[],[]
+        
+        for num in range(len(binx)-1):
+            keepbins = (keep) & (coord[x] > binx[num]) & (coord[x] < binx[num+1])
+            
+            if np.sum(keepbins) > 0:
+                perc = np.percentile(coord[y][keepbins][np.isfinite(coord[y][keepbins])],(3,97))
+                binc.append(binx[num] + binw)
+                median.append(np.median(coord[y][keepbins]))
+                lower.append(perc[0])
+                upper.append(perc[1])
+            else:
+                continue
+        
+        ax.plot(binc, median, lw=2, c='r')
+        ax.fill_between(binc, upper, lower, facecolor='gray', alpha=0.5)
+        
+    if plothist:
+        
+        rect_histx = [left, bottom, width, 0.2]
+        rect_histy = [left, bottom, 0.2, height]
+        axHistx = fig.add_axes(rect_histx)
+        axHisty = fig.add_axes(rect_histy)
+        binsy = np.linspace(ylim[0], ylim[1], 40)
+        binsx = np.linspace(xlim[0], xlim[1], 40)
+    
+        log = False
+        N1 = axHistx.hist(coord[x][keep], bins=binsx, log=log, align='mid', color='r', lw=2, histtype='step')
+        N2 = axHisty.hist(coord[y][keep], bins=binsy, log=log, align='mid', color='r', lw=2, histtype='step', orientation='horizontal')
+        print('x max:',N1[0].max())
+        print('y max:',N2[0].max())
+        #axHistx.set_ylim(1, 700)
+        #axHisty.set_xlim(1, 700)
+        
+        axHistx.set_xlim(xlim[0], xlim[1])
+        axHisty.set_ylim(ylim[0], ylim[1])
+        axHistx.axis('off')
+        axHisty.axis('off')
+        #ax.axis('off')
+        
+        #axHistx.yaxis.set_ticks_position('right')
+        #axHisty.yaxis.set_ticks_position('right')
+        
+    
     #clab = r'$N$'
     if cbar in ['horizontal', 'vertical']:
-        cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=0.15)
+        if plothist:
+            if cbar == 'horizontal': cbaxes = fig.add_axes([left, bottom-0.2, width, height*0.08])
+            elif cbar == 'vertical': cbaxes = fig.add_axes([0.95, 0.1, 0.06, 0.8])
+            cb = fig.colorbar(pos, cax=cbaxes, orientation=cbar)
+            
+            #cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=.5)
+        else:                                      
+            cb = fig.colorbar(pos, ax=ax, orientation=cbar, pad=0.15)
     elif cbar is 'panel':
         cbar_ax = fig.add_axes([0.95, 0.15, 0.02, 0.7])
         cb = fig.colorbar(pos, cax=cbar_ax)
     else: raise ValueError('cbar is either vertical, horizontal or panel.')
-    cb.set_label(label=r'$N$', size='large', weight='bold')
-    cb.ax.tick_params(labelsize='large')
+        
+    if clab is None: clab = r'$N$'
+        
+    cb.set_label(label=clab, size=20, weight='bold')
+    cb.ax.tick_params(labelsize=16)
     
     if file is not None:
         fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
+        
+    if showmedian:
+        return ax, binc, median
+    else:
+        return ax
         
         
 
@@ -522,7 +613,7 @@ def get_systplot(systquant):
     return tmparray[tmpind,1], tmparray[tmpind,2]
 
 #
-def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False):
+def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False, cols=None, overbyreg=True, percentiles=[1,99], get_values=False):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
 
@@ -570,11 +661,11 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
     axh.axes.get_yaxis().set_ticks([])
     
     ## systematics
-    cols = ['0.5','b','g','r']
+    if cols is None: cols = ['0.5','b','g','r']
     lstys = ['-', '--', '-.']
     #regs = ['all','des','decals','north']
     densmin,densmax = 0,2
-    for reg,col in zip(regs,cols):
+    for reg,col1 in zip(regs,cols):
         
         if (reg=='all'):
             isreg    = (mainreg)
@@ -584,7 +675,10 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             if (reg == regs[0]) & (len(regs) > 1): lw,alpha = 3,0.5
             else: lw,alpha = 1,1.0
                 
-        for namesel,col in zip(namesels, cols):
+        for namesel,col2 in zip(namesels, cols):
+            
+            if len(namesels) > 1: col = col2
+            else: col = col1
             
             if (namesel == namesels[0]) & (len(namesels) > 1): lw,alpha = 3,0.5
             else: lw,alpha = 1,1.0
@@ -593,6 +687,11 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             tmpdens   = hpdens[mainreg & mask]
         
             tmpsyst   = hpdicttmp[syst][isreg]
+            
+            if percentiles is not None: 
+                xlim = (np.percentile(tmpsyst[tmpsyst>0],(percentiles[0],percentiles[1])))
+                
+            
         #xlim      = tmpsyst[(tmpsyst>0) & (np.isfinite(tmpsyst))].min(), tmpsyst[(tmpsyst>0) & (np.isfinite(tmpsyst))].max()
         #xlim, _ = get_systplot(syst)
         #if clip: xlim = np.percentile(tmpsyst[(tmpsyst>0) & (np.isfinite(tmpsyst))],(1,99))
@@ -609,8 +708,10 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             systquant = tmpsyst[tmp] #systematics per region
             systdens  = tmpdens[tmp] #target density per region per bit
         
-            #systdens /= hpdicttmp['meandens_'+namesel+'_'+reg] #density/mean density per bit per region
-            systdens /= hpdicttmp['meandens_'+namesel+'_'+'all'] #density/mean density per bit overall desi footprint
+            if overbyreg: 
+                if (reg=='all'): systdens /= hpdicttmp['meandens_'+namesel+'_'+'all']
+                else: systdens /= hpdicttmp['meandens_'+namesel+'_'+reg] #density/mean density per bit per region
+            else: systdens /= hpdicttmp['meandens_'+namesel+'_'+'all'] #density/mean density per bit overall desi footprint
         
         #print(systdens)
         #print(systquant)
@@ -661,6 +762,13 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             elif reg == 'north': ynorth = systv
             elif reg == 'decals': ydecals = systv
             elif reg == 'des': ydes = systv
+            
+    if (weights) & (ws is None):
+        return b0, m0, [plotxgrid,systv,systverr], [plotxgrid_w,systv_w,systverr_w]
+    elif get_values: 
+        return plotxgrid,systv,systverr, lab
+    else:
+        return ax
     #return x, yall, ynorth, ydecals, ydes
     
 def pixcorr(x=None, y=None, nx=20, xlim=None):
@@ -702,17 +810,21 @@ class linfit:
         return chi
     
 def mollweide(hpdict=None, C=None, namesel=None, reg=None, nside=256, projection=None, n=None, org=None, cm=None, 
-              fig=None, gs=None, ws=None, perc=(1, 99), title=None, cval=None):
+              fig=None, gs=None, ws=None, perc=(1, 99), title=None, cval=None, desifootprint=True, dr='drx'):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
     
-    if reg == 'all': mainreg = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0)
-    else: mainreg = (hpdict['isdesi']) & (hpdict['bgsfracarea']>0) & (hpdict['is'+reg])
+    if desifootprint: isdesi = hpdict['isdesi']
+    else: isdesi = np.ones_like(hpdict['ra'], dtype=bool)
+        
+    if reg == 'all': mainreg = (isdesi) & (hpdict['bgsfracarea']>0)
+    else: mainreg = (isdesi) & (hpdict['bgsfracarea']>0) & (hpdict['is'+reg])
+        
     ramw,decmw = get_radec_mw(hpdict['ra'],hpdict['dec'],org)
     if C is None:
         hpdens = (hpdict['south_n'+namesel] + hpdict['north_n'+namesel] ) / (pixarea * hpdict['bgsfracarea'])
         hpmean = hpdict['meandens_'+namesel+'_'+reg]
-        clab      = 'LS dr8/'+namesel+r' density [deg$^{-2}$]'
+        clab      = 'LS %s/%s density [deg$^{-2}$]' %(dr, namesel)
     else:
         key = list(C.keys())[0]
         val = C[key]
@@ -869,7 +981,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
     ------
     (distance (arcsec), density) if density=True
     '''
-    
+    from io_ import search_around #if issues with this, comment it run notebook and then uncomment it and run notebook again
     # define the slit width for estimating the overdensity off diffraction spikes
     slit_width = slitw
     search_radius = SR[1]
@@ -920,6 +1032,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
         mag_bins_len = len(mag_bins)-1
     else:
         raise ValueError('Invaid bintype. Choose bintype = 0, 1, 2')
+    print('mag_bins_len:', mag_bins_len)
     
     
     if grid is not None:
@@ -947,19 +1060,32 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             raise ValueError('Invaid bintype. Choose bintype = 0, 1, 2')
 
         if log: print(title)
-        magminrad = circular_mask_radii_func([mag_bins[index+1]], radii_1, bestfit=radii_bestfit)[0]
-        magmaxrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+        if bintype != '1':
+            magminrad = circular_mask_radii_func([mag_bins[index+1]], radii_1, bestfit=radii_bestfit)[0]
+            magmaxrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+        else:
+            if index == 0:
+                magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+                magmaxrad = magminrad
+            else:
+                magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+                magmaxrad = circular_mask_radii_func([mag_bins[index-1]], radii_1, bestfit=radii_bestfit)[0]
 
+        if log: print('MARK #1')
+            
         if not scaling:
             #get the mask radii from the mean magnitude
             mag_mean = np.mean(star[nameMag][mask_star])
             if log: print('mag_mean', mag_mean)
             mask_radius = circular_mask_radii_func([mag_mean], radii_1, bestfit=radii_bestfit)[0]
             if radii_2:
-                mask_radius2 = circular_mask_radii_func([mag_mean], radii_2)[0]
+                mask_radius2 = circular_mask_radii_func([mag_mean], radii_2, bestfit=radii_bestfit)[0]
+                if log: print('mask_radius2', mask_radius2)
 
         idx2, idx1, d2d, d_ra, d_dec = search_around(ra2[mask_star], dec2[mask_star], ra1, dec1,
                                                  search_radius=annulus_max, verbose=False)
+        
+        if log: print('MARK #2')
 
         Nsources = len(ra2[mask_star])
         perc_sources = 100*len(ra2[mask_star])/len(ra2)
@@ -981,6 +1107,7 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
         
         if scaling:
             d2d_arcsec = d2d
+            #d2d is already in arcsec with r^2 = ra^2*cos(dec)^2 + dec^2
             d_ra, d_dec, d2d = d_ra/mag_radii, d_dec/mag_radii, d2d_arcsec/mag_radii
             search_radius = SR_scaling #d2d.max() - d2d.max()*0.3
             #ntot_annulus = np.sum((d2d_arcsec>annulus_min) & (d2d<search_radius))
@@ -998,8 +1125,10 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             annMask = np.ones(len(cat), dtype='?')
             d_ra2 = np.zeros(len(cat))
             d_dec2 = np.zeros(len(cat))
+            d2d2 = np.zeros(len(cat))
             d_ra2[idx1] = d_ra
             d_dec2[idx1] = d_dec
+            d2d2[idx1] = d2d
             if log: print(len(cat), len(d_ra2), len(d_dec2))
             #print(len(set(idx1)), len(set(idx2)))
             #print(idx1.max(), idx2.max())
@@ -1021,10 +1150,12 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             for i in [magminrad, magmaxrad]:
                 x = i * np.sin(angle_array)
                 y = i * np.cos(angle_array)
-                ax[-1].plot(x, y, 'k', lw=2)
+                ax[-1].plot(x, y, 'k', lw=2, alpha=0.4)
+            ax[-1].plot(mask_radius * np.sin(angle_array), mask_radius * np.cos(angle_array), 'k', lw=2)
+                
             
-            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.05, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=8,color='k')
-            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.11, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=8,color='k')
+            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.05, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=10,color='k')
+            ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.11, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=10,color='k')
             #ax[-1].text(-annulus_max+annulus_max*0.02, annulus_max-annulus_max*0.17, '$\eta$=%2.3g arcsec$^{-2}$' %(density_annulus), fontsize=8,color='k')
 
             ax[-1].set_xlabel(r'$\Delta$RA (arcsec)', size=20)
@@ -1033,21 +1164,31 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             if radii_2:
                 x2 = mask_radius2 * np.sin(angle_array)
                 y2 = mask_radius2 * np.cos(angle_array)
-                ax[-1].plot(x2, y2, 'k', lw=1.5, linestyle='--')
+                ax[-1].plot(x2, y2, 'gold', lw=2, linestyle='-')
         else:
             angle_array = np.linspace(0, 2*np.pi, 100)
             x = 1 * np.sin(angle_array)
             y = 1 * np.cos(angle_array)
-            ax[-1].plot(x, y, 'k', lw=4)
+            ax[-1].plot(x, y, 'k', lw=2)
             
-            ax[-1].text(-SR_scaling+0.1, SR_scaling-0.2, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=10,color='k')
-            ax[-1].text(-SR_scaling+0.1, -SR_scaling+0.1, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=10,color='k')
+            ax[-1].text(-SR_scaling+0.1, SR_scaling-0.2, '%d sources ~%2.3g %% ' %(Nsources, perc_sources), fontsize=12,color='k')
+            ax[-1].text(-SR_scaling+0.1, -SR_scaling+0.1, '%d objects ~%2.3g %% ' %(ntot_annulus, 100*ntot_annulus/len(ra1)), fontsize=12,color='k')
             #ax[-1].text(-SR_scaling+0.1, SR_scaling-0.9, '$\eta$=%2.3g deg$^{-2}$' %(density_annulus), fontsize=8,color='k')
 
-            ax[-1].set_xlabel(r'$\Delta$RA/$r_{BS}(mag)$', size=20)
-            if ((cols > 1) & (index == 0)) or (cols < 2): ax[-1].set_ylabel(r'$\Delta$DEC/$r_{BS}(mag)$', size=20)
+            ax[-1].set_xlabel(r'$\Delta$RA/$R_{BS}$', size=18)
             
-        ax[-1].set_title(title)
+            ybox1 = TextArea(r'$\Delta$DEC/$R_{BS}$, ', textprops=dict(color="k", size=18,rotation=90,ha='left',va='bottom'))
+            ybox3 = TextArea(r'$\log_{2}(\eta (\Delta R)/\bar{\eta})$', textprops=dict(color="r", size=18,rotation=90,ha='left',va='bottom'))
+
+            ybox = VPacker(children=[ybox3, ybox1],align="bottom", pad=0, sep=5)
+
+            anchored_ybox = AnchoredOffsetbox(loc=8, child=ybox, pad=0., frameon=False, bbox_to_anchor=(-0.08, 0.25), 
+                                              bbox_transform=ax[-1].transAxes, borderpad=0.)
+
+            #if ((cols > 1) & (index == 0)) or (cols < 2): ax[-1].set_ylabel(r'$\Delta$DEC/$R_{BS}$', size=18)
+            if ((cols > 1) & (index == 0)) or (cols < 2): ax[-1].add_artist(anchored_ybox)
+            
+        ax[-1].set_title(title, size=18)
         ax[-1].axvline(0, ls='--', c='k')
         ax[-1].axhline(0, ls='--', c='k')
         if annulus is not None:
@@ -1060,7 +1201,8 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             fig.savefig(filename+'.png', bbox_inches = 'tight', pad_inches = 0)
     
     if annulus is not None:
-        return d_ra2, d_dec2, annMask
+        return d2d2, d_ra2, d_dec2, annMask
+    
 
 def relative_density_plot(d_ra, d_dec, d2d, search_radius, ref_density, nbins=101, return_res=False, 
                           show=True, ax=plt, d2d_arcsec=None, annulus_min=2, logDenRat=[-3,3], 
@@ -1155,14 +1297,15 @@ def relative_density_plot(d_ra, d_dec, d2d, search_radius, ref_density, nbins=10
     #ax.colorbar(fraction=0.046, pad=0.04)
     cb = fig.colorbar(img, fraction=0.046, pad=0.04)
     
-    cb.set_label(label=r'$\log_{2}(\eta_{pix}/\eta_{tot})$', size='large', weight='bold')
-    cb.ax.tick_params(labelsize='large')
+    cb.set_label(label=r'$\log_{2}(\eta_{pix}/\bar{\eta})$', weight='bold', size=18)
+    cb.ax.tick_params(labelsize=15)
+    ax.tick_params(axis='both', which='major', labelsize=15)
     
     #ax.plot(np.array(dpx), dpy, lw=2.5, color='green')
-    ax.plot(np.array(dpx2), dpy2, lw=2.5, color='red')
+    ax.plot(np.array(dpx2), dpy2, lw=2, color='darkred')
     
     # find the max, min of density ratio profile for distances > 1
-    ax.text(1*search_radius/10., search_radius - 2*search_radius/30, '$max(\eta(\Delta r)/\eta, r>%i)=%2.3g$' %(maglimrad, 2**(dmax)), fontsize=10,color='k')
+    ax.text(1*search_radius/10., search_radius - 2*search_radius/30, '$max(\eta(\Delta R)/\eta, r>%i)=%2.3g$' %(maglimrad, 2**(dmax)), fontsize=14,color='k')
     #ax.text(4*search_radius/10., search_radius - 4*search_radius/30, '$min(\eta(\delta r)/\eta)=%2.3g$' %(2**(dmin)), fontsize=10,color='k')
     
     ax.set_ylim(-search_radius, search_radius)
@@ -1248,10 +1391,171 @@ def limits():
     limits = {}
     limits['Grr'] = (-3, 5)
     limits['G-rr'] = (-3, 5)
-    limits['g-z'] = (-1.8, 6)
+    limits['g-z'] = (-2, 6)
     limits['r'] = (15, 20.1)
-    limits['rfibmag'] = (16, 26)
-    limits['g-r'] = (-0.5, 2.3)
+    limits['rfibmag'] = (16, 27)
+    limits['g-r'] = (-2, 6)
     limits['r-z'] = (-0.7, 2.8)
     
     return limits
+
+def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None, colors=None):
+    '''inputs A, B, C must booleans.'''
+    
+    A1 = A
+    B1 = B
+    C1 = C
+    AB = (A1) & (B1)
+    AC = (A1) & (C1)
+    BC = (B1) & (C1)
+    ABC = (A1) & (B1) & (C1)
+            
+    if norm is None: norm, sf = 1, 1
+    else: sf = 1
+        
+    a1 = round((np.sum(A1) - np.sum(AB) - np.sum(AC) + np.sum(ABC))/norm, sf)
+    a2 = round((np.sum(B1) - np.sum(AB) - np.sum(BC) + np.sum(ABC))/norm, sf)
+    a3 = round((np.sum(AB) - np.sum(ABC))/norm, sf)
+    a4 = round((np.sum(C1) - np.sum(AC) - np.sum(BC) + np.sum(ABC))/norm, sf)
+    a5 = round((np.sum(AC) - np.sum(ABC))/norm, sf)
+    a6 = round((np.sum(BC) - np.sum(ABC))/norm, sf)
+    a7 = round(np.sum(ABC)/norm, sf)
+        
+    if labels is None: labels = ['Group A', 'Group B', 'Group C']
+    if colors is None: colors = ['r', 'green', 'b']
+        
+    fig = plt.figure(figsize=(7,7))
+    v=venn3([a1, a2, a3, a4, a5, a6, a7], set_labels = (labels[0], labels[1], labels[2]), set_colors=(colors), alpha = 0.6)
+    c=venn3_circles([a1, a2, a3, a4, a5, a6, a7], linestyle='dotted', linewidth=1, color="k")
+    #c[1].set_lw(1.0)
+    #if colors is not None:
+        #c[0].set_color(colors[0])
+        #c[1].set_color(colors[1])
+        #c[2].set_color(colors[2])
+    #c[0].set_ls('dotted')
+    #c[1].set_ls('solid')
+    #c[2].set_ls('dashed')
+    #c[1].set_lw(2.0)
+    
+    if title is not None: plt.title(title, size=20)
+    if file is not None:
+        fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
+
+    plt.show()
+    
+    
+from matplotlib_venn import venn2, venn2_circles
+
+def plot_venn2(A,B,area, title=None, labels=None, savefile=None):
+
+    fig = plt.figure(figsize=(10,10))
+
+    sf = 2
+    #area = hpdict0['bgsarea_'+survey]
+
+    a = A
+    b = B
+    c = (a) & (b)
+
+    a1 = round(((np.sum(a) - np.sum(c))/area), sf)
+    b1 = round(((np.sum(b) - np.sum(c))/area), sf)
+    c1 = round(np.sum(c)/area, sf)
+
+    if title is not None: plt.title(title, size=18)
+    if labels is None: labels = ('group A', 'group B')
+
+    venn2([a1, b1, c1], set_labels = labels)
+    #venn2([a1, b1, c1])
+    c=venn2_circles([a1, b1, c1], linestyle='solid', linewidth=1, color="k")
+
+    #filename = '%s/%s' %(pathdir, savefile)
+    if savefile is not None:
+        fig.savefig(savefile+'.png', bbox_inches = 'tight', pad_inches = 0)
+    
+
+def scatterplot(coord=None, catmask=None, xlim=None, ylim=None, title=None, fig=None, gs=None, n=None, ylab=True, 
+                xlab=True, hline=None, vline=None, fmcline=False, file=None, contour1=None):
+    
+    x, y = coord.keys()
+    
+    ax = fig.add_subplot(gs[n])
+    if title is not None: ax.set_title(r'%s' %(title), size=20)
+    if xlim is None: xlim = limits()[x]
+    if ylim is None: ylim = limits()[y]
+    masklims = (coord[x] > xlim[0]) & (coord[x] < xlim[1]) & (coord[y] > ylim[0]) & (coord[y] < ylim[1])
+    
+    if catmask is None: 
+        keep = masklims
+        ax.scatter(coord[x][keep], coord[y][keep])
+    else:
+        for key, val in zip(catmask.keys(), catmask.values()):
+            keep = (val) & (masklims)
+            
+            if np.sum(keep) < 100: s = 15
+            elif np.sum(keep) > 1000: s = 1
+            else: s = 3
+        
+            ax.scatter(coord[x][keep], coord[y][keep], s=s, label=key)
+            
+    if ylab: ax.set_ylabel(r'%s' %(y), size=20)
+    if xlab: ax.set_xlabel(r'%s' %(x), size=20)
+    if hline is not None: ax.axhline(hline, ls='--', lw=2, c='r')
+    if vline is not None: ax.axvline(vline, ls='--', lw=2, c='r')
+    if fmcline: 
+        x_N1 = np.linspace(15.5, 17.1, 4)
+        ax.plot(x_N1, 2.9 + 1.2 + x_N1, color='r', ls='--', lw=2)
+        x_N2 = np.linspace(17.1, 18.3, 4)
+        ax.plot(x_N2, x_N2*0.+21.2, color='r', ls='--', lw=2)
+        x_N3 = np.linspace(18.3, 20.1, 4)
+        ax.plot(x_N3, 2.9 + x_N3, color='r', ls='--', lw=2)
+        
+    lgnd = plt.legend()
+    [handle.set_sizes([20]) for handle in lgnd.legendHandles]
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    
+    #contour galaxies
+    #np.logspace(0, 2, 5)
+    if contour1 is not None:
+        bgs_den = density_patch(coord=contour1, xlim=xlim, ylim=ylim, plot=False, nmin=0)
+        ax.contour(bgs_den.transpose(), levels=(0, 10), origin='lower', aspect='equal',
+              extent=np.array([xlim[0], xlim[1], xlim[0], xlim[1]]), colors='black', alpha=0.3)
+        
+    if file is not None:
+        fig.savefig(file+'.png', bbox_inches = 'tight', pad_inches = 0)
+        
+def density_patch(coord=None, xlim=None, ylim=None, nbins=100, plot=False, title=None, nmin=None):
+    
+    from matplotlib.colors import LogNorm
+    
+    x, y = coord.keys()
+    
+    if title is not None: ax.set_title(r'%s' %(title), size=20)
+    if xlim is None: xlim = limits()[x]
+    if ylim is None: ylim = limits()[y]
+    masklims = (coord[x] > xlim[0]) & (coord[x] < xlim[1]) & (coord[y] > ylim[0]) & (coord[y] < ylim[1])
+    
+    bins = np.linspace(xlim[0], xlim[1], nbins)
+    bin_spacing = bins[1] - bins[0]
+    bincenter = (bins[1:]+bins[:-1])/2
+    #mesh_x, mesh_y = np.meshgrid(bincenter, bincenter)
+    
+    xx, yy = coord[x][masklims], coord[y][masklims]
+    #xx, yy = coord[x], coord[y]
+    
+    #taking the 2d histogram and divide by the area of each bin to get the density
+    density, _, _ = np.histogram2d(xx, yy, bins=bins)
+    if nmin is not None:
+        density[density < nmin] = np.nan
+    
+    if plot:
+        plt.figure(figsize=(8, 8))
+        plt.imshow(density.transpose(), origin='lower', aspect='equal',
+               cmap='seismic', extent=np.array([xlim[0], xlim[1], ylim[0], ylim[1]]), norm=LogNorm()) #, vmin=-3, vmax=3
+        #plt.imshow(density.transpose(),
+        #       cmap='seismic', norm=LogNorm()) #, vmin=-3, vmax=3
+        plt.colorbar(fraction=0.046, pad=0.04)
+        plt.xlabel(x, size=20)
+        plt.ylabel(y, size=20)
+    
+    return density

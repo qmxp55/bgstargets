@@ -21,5 +21,6 @@ ap.add_argument('-OF',
 ns = ap.parse_args()
 if ns.dr == 'dr9sv': Nran = 1
 else: Nran = ns.Nran
+print('NRAN', Nran)
 
-randoms = get_random(N=Nran, sweepsize=None, dr=ns.dr, dirpath=ns.OF)
+randoms = get_random(N=int(Nran), sweepsize=None, dr=ns.dr, dirpath=ns.OF)

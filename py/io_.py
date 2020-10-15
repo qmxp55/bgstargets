@@ -14,6 +14,98 @@ from cuts import getGeoCuts, getPhotCuts, get_bgs, get_bgs_sv
 
 #from QA import circular_mask_radii_func
 
+#
+import progressbar
+import time
+
+def get_tractor_rectangle_patch(tractor_path, patch=None):
+    
+    #get all file paths
+    ramin, ramax, decmin, decmax = patch
+    tdirs = os.listdir(tractor_path)
+    tractor_files = []
+    for num, tdir in enumerate(tdirs):
+        for file in sorted(glob.glob(os.path.join(tractor_path+tdir, '*.fits'))):
+            if file.split('/')[-1][:7] == 'tractor':
+            
+                RA = int(file[-13:-9])/10
+                DEC = int(file[-8:-5])/10
+                if file[-9] == 'm': 
+                    DEC = DEC * (-1)
+
+                delta = 1
+                if (np.logical_and(RA < ramax+delta, RA > ramin-delta)) & (np.logical_and(DEC < decmax+delta, DEC > decmin-delta)):
+                    tractor_files.append(file)
+    
+    return tractor_files
+
+def get_tractor(tractor_path=None, patches=None, outdir=None, rlimit=None, opt='1', cols=None):
+    '''Main function to extract the data from the SWEEPS'''
+    
+    import time
+    start = time.time()
+    
+    if cols is None:
+        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
+                                           'SHAPE_E1', 'SHAPE_E1_IVAR', 'SHAPE_E2', 'SHAPE_E2_IVAR', 'SERSIC', 'SERSIC_IVAR',
+                                               'RELEASE', 'BRICKID', 'BRICKNAME', 'OBJID', 'BRICK_PRIMARY', 'FITBITS']
+        
+    catdict = {}
+    
+    if patches is None:
+        
+        tdirs = os.listdir(tractor_path)
+        tractor_files = []
+        for tdir in tdirs:
+            for file in sorted(glob.glob(os.path.join(tractor_path+tdir, '*.fits'))):
+                if file.split('/')[-1][:7] == 'tractor':
+                    tractor_files.append(file)
+    else:
+        tractor_files = []
+        for key, patch in zip(patches.keys(), patches.values()):
+            files = get_tractor_rectangle_patch(tractor_path=tractor_path, patch=patch)
+            print('Bricks found in %s footprint: \t %i' %(key, len(files)))
+            for file in files:
+                tractor_files.append(file)
+        
+    print('Total bricks found: \t %i' %(len(tractor_files)))
+
+    #print('Found %i tractor files' %(len(tractor_files)))
+    
+    widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(tractor_files)).start()
+
+    for i, file in enumerate(tractor_files):
+
+        cat = fitsio.read(file, columns=cols, upper=True, ext=1)
+        primary = cat['BRICK_PRIMARY']
+        
+        if rlimit != None:
+            keep = np.ones_like(cat, dtype='?')
+            rflux = cat['FLUX_R'] / cat['MW_TRANSMISSION_R']
+            keep &= rflux > 10**((22.5-rlimit)/2.5)
+            catdict[file] = cat[(keep) & (primary)]
+            #catdict[file] = cat[(keep)]
+        else:
+            catdict[file] = cat[primary]
+
+        time.sleep(0.1)
+        bar.update(i + 1)
+        
+    cat = np.concatenate(tuple(catdict.values()))
+    if outdir is not None:
+        np.save(outdir, cat)
+        
+    end = time.time()
+    print('Total run time: %f sec' %(end - start))
+
+    return cat
+
 def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=False):
     
     import time
@@ -117,7 +209,6 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     The subsample catalogue will be also stored with name 'sweep_RAmin_RAmax_DECmin_DECmax_rmag_rlimit' and numpy format '.npy'
     
     """
-    import time
     start = time.time()
     
     namelab = []
@@ -140,6 +231,18 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
                                  'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
                                        'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
                                            'SHAPE_E1', 'SHAPE_E1_IVAR']
+        
+        
+    elif dr[:4] == 'dr9m':
+        
+        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
+                                           'SHAPE_E1', 'SHAPE_E1_IVAR', 'SHAPE_E2', 'SHAPE_E2_IVAR', 'SERSIC', 'SERSIC_IVAR',
+                                               'RELEASE', 'BRICKID', 'BRICKNAME', 'OBJID', 'FITBITS']
     else:
         
         cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
@@ -168,6 +271,8 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr9jnorth = '/global/cscratch1/sd/adamyers/dr9j/north/sweep'
     sweep_dir_dr9ksouth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9k/south/sweep'
     sweep_dir_dr9knorth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9k/north/sweep'
+    sweep_dir_dr9msouth = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/south/sweep'
+    sweep_dir_dr9mnorth = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/north/sweep'
     
     if not sweep_file:
         if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
@@ -185,6 +290,8 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         elif dr == 'dr9j-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9jnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
         elif dr == 'dr9k-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9ksouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
         elif dr == 'dr9k-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9knorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9m-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9msouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9m-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9mnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
             
         #elif (dr is 'dr8') or (dr is 'dr9d'):
         #    if dr is 'dr8':
@@ -283,16 +390,53 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     
     if not sweep_file: 
         if opt == '1': return tab
-        if opt == '2': return dfsouth, dfnorth
+        if opt == '2': return tab
     else: return np.load(os.path.abspath(sweepdir+sweep_file_name+'.npy'))
+
     
-    
-def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='1', cols=None):
-    '''Main function to extract the data from the SWEEPS'''
-    
-    j = 0
+def get_files_sweeps(sweep_dir=None, patch=None):
     
     sweepfiles = sorted(glob.glob(os.path.join(sweep_dir, '*.fits')))
+    selected = []
+    
+    for i, file in enumerate(sweepfiles):
+            
+        if patch is not None:
+
+            ramin, ramax, decmin, decmax = patch[0], patch[1], patch[2], patch[3]
+
+            #cat1_path = cat1_paths[fileindex]
+            #print(cat1_path)
+            filename = file[-26:-5]
+            brick = file[-20:-5]
+            ra1min = float(brick[0:3])
+            ra1max = float(brick[8:11])
+            dec1min = float(brick[4:7])
+            if brick[3]=='m':
+                dec1min = -dec1min
+            dec1max = float(brick[-3:])
+            if brick[-4]=='m':
+                dec1max = -dec1max
+
+            r1=Rectangle(Point(ramin,decmin), Point(ramax, decmax), 'red')
+            r2=Rectangle(Point(ra1min, dec1min), Point(ra1max, dec1max), 'blue')
+
+            if not r1.intersects(r2):
+                continue
+            else:
+                print(file)
+                selected.append(file)
+                
+        else:
+            
+            selected.append(file)
+            
+    #print(len(selected))
+            
+    return selected
+    
+def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='2', cols=None):
+    '''Main function to extract the data from the SWEEPS'''
     
     if cols is None:
         cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
@@ -306,6 +450,12 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
     #sweepfiles = sweepfiles[:2]
     
     if opt == '1':
+        
+        start = time.time()
+        
+        j = 0
+        sweepfiles = sorted(glob.glob(os.path.join(sweep_dir, '*.fits')))
+    
         #print('--------- OPTION 1 ---------')
         for i, file in enumerate(sweepfiles):
             
@@ -371,8 +521,54 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
             cat0 = None
             print('\t Sample # objects: %i' %(0))
             
+        end = time.time()
+        print('Total run time: %f sec' %(end - start))
+            
     if opt == '2':
         print('--------- OPTION 2 ---------')
+        catdict = {}
+        
+        start = time.time()
+        sweep_files = get_files_sweeps(sweep_dir=sweep_dir, patch=patch)
+        
+        print('Total bricks found: \t %i' %(len(sweep_files)))
+    
+        widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
+        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(sweep_files)).start()
+        
+
+        for i, file in enumerate(sweep_files):
+
+            cat = fitsio.read(file, columns=cols, upper=True, ext=1)
+            if patch is not None:
+                ramin, ramax, decmin, decmax = patch[0], patch[1], patch[2], patch[3]
+                cat = cut(ramin, ramax, decmin, decmax, cat)
+
+            if rlimit != None:
+                keep = np.ones_like(cat, dtype='?')
+                rflux = cat['FLUX_R'] / cat['MW_TRANSMISSION_R']
+                keep &= rflux > 10**((22.5-rlimit)/2.5)
+                if maskbitsource:
+                    keep &= ((cat['REF_CAT'] != '  ') | (cat['REF_CAT'] != b'  '))
+                catdict[file] = cat[(keep)]
+                #catdict[file] = cat[(keep)]
+            else:
+                keep = np.ones_like(cat, dtype='?')
+                if maskbitsource:
+                    #print('HEREEEEEEE!!!!!!!!')
+                    keep &= ((cat['REF_CAT'] != '  '))
+                catdict[file] = cat[keep]
+
+            time.sleep(0.1)
+            bar.update(i + 1)
+
+        cat0 = np.concatenate(tuple(catdict.values()))
+
+        end = time.time()
+        print('Total run time: %f sec' %(end - start))
+            
+    if opt == '3':
+        print('--------- OPTION 3 ---------')
         cat0 = {}
         for i in cols: cat0[i] = []
         for i, file in enumerate(sweepfiles):
@@ -470,7 +666,8 @@ def cut(ramin, ramax, decmin, decmax, catalog):
 def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=None, maskrand=None, maskcat=None, 
                  getnobs=False, nside=None, npix=None, nest=None, pixarea=None, Nranfiles=None, 
                      ranindesi=None, catindesi=None, dec_resol_ns=32.375, namesels=None, galb=None, survey='main', 
-                         desifootprint=True, target_outputs=True, log=False, tiledir='/global/cscratch1/sd/raichoor/', ws=None):
+                         desifootprint=True, target_outputs=True, log=False, tiledir='/global/cscratch1/sd/raichoor/', ws=None,
+                             ranfiledens=5000):
 
    # start = raichoorlib.get_date()
     # creating dictionary
@@ -526,7 +723,7 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     if log: print('systematics DONE...')
         
     # computing fracareas
-    randdens = 5000*Nranfiles
+    randdens = ranfiledens*Nranfiles
     if log: print('randdens = ', randdens, ' ; len randoms = ', len(hppix_ran))
     if desifootprint: mainfootprint = ranindesi
     else: mainfootprint = np.ones_like(hppix_ran, dtype='?')
@@ -576,8 +773,13 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     hpdict['issvfields_ij_n'] = (hpdict['issvfields_ij']) & (hpdict['isnorth'])
     hpdict['issvfields_ij_s'] = (hpdict['issvfields_ij']) & (hpdict['issouth'])
     
+    hpdict['issvfields_k'] = get_svfields_k(hpdict['ra'],hpdict['dec'], survey='all')
+    hpdict['issvfields_k_n'] = (hpdict['issvfields_k']) & (hpdict['isnorth'])
+    hpdict['issvfields_k_s'] = (hpdict['issvfields_k']) & (hpdict['issouth'])
+    
     regs = ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s', 
-           'svfields_fg', 'svfields_fg_n', 'svfields_fg_s', 'svfields_ij', 'svfields_ij_n', 'svfields_ij_s']
+           'svfields_fg', 'svfields_fg_n', 'svfields_fg_s', 'svfields_ij', 'svfields_ij_n', 'svfields_ij_s',
+           'svfields_k', 'svfields_k_n', 'svfields_k_s']
     
     #hpdict['istest'] = (hpdict['ra'] > 160.) & (hpdict['ra'] < 230.) & (hpdict['dec'] > -2.) & (hpdict['dec'] < 18.)
     if log: print('regions DONE...')
@@ -760,6 +962,11 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
         elif (dr == 'dr9sv'):
             ranpath = '/global/cfs/cdirs/desi/target/catalogs/dr9sv/0.37.0/randoms/'
             randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
+        elif (dr == 'dr9d'):
+            ranpath = '/project/projectdirs/desi/target/catalogs/dr9d/PRnone/randoms/'
+            random_south = ranpath + 'dr9d-south/' + 'randoms-dr9-hp-X-1.fits'
+            random_north = ranpath + 'dr9d-north/' + 'randoms-dr9-hp-X-1.fits'
+            randoms = [random_south, random_north]
         elif (dr == 'dr9f'):
             ranpath = '/project/projectdirs/desi/target/catalogs/dr9f/0.38.0/randoms/resolve/'
             randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
@@ -775,14 +982,14 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
         elif (dr == 'dr9k'):
             ranpath = '/global/cfs/cdirs/desi/target/catalogs/dr9k/0.40.0/randoms/resolve/'
             randoms = [ranpath + 'randoms-dr9-hp-X-1.fits']
-        elif (dr == 'dr9d'):
-            ranpath = '/project/projectdirs/desi/target/catalogs/dr9d/PRnone/randoms/'
-            random_south = ranpath + 'dr9d-south/' + 'randoms-dr9-hp-X-1.fits'
-            random_north = ranpath + 'dr9d-north/' + 'randoms-dr9-hp-X-1.fits'
-            randoms = [random_south, random_north]
+        elif (dr == 'dr9m'):
+            ranpath = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/0.42.0/randoms/resolve/'
+            randoms = glob.glob(ranpath + 'randoms*')
+        
             
         if len(randoms) > 1: randoms.sort()
         if dr == 'dr8': randoms = randoms[0:N]
+        if dr == 'dr9m': randoms = randoms[0:N]
 
         for i in range(len(randoms)):
             df_ran = fitsio.read(randoms[i], columns=['RA', 'DEC', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'MASKBITS'],upper=True, ext=1)
@@ -1035,7 +1242,7 @@ def get_svfields_k(ra, dec, survey='all'):
      
     if survey == 'north':
         svfields = {}
-        svfields['ages'] = [216, 220, 30, 40] #40
+        svfields['ages'] = [216, 220, 33, 40] #40
         svfields['refnorth'] = [215, 230, 41, 46] #56
         svfields['egs'] = [210, 220, 50, 55] #31
         svfields['highstardens_n'] = [273, 280, 40, 45] #37
@@ -1048,11 +1255,44 @@ def get_svfields_k(ra, dec, survey='all'):
         svfields['highebv_s'] = [240, 245, 20, 25] #23
         svfields['highstardens_s'] = [260, 268, 15, 20] #47
         #north
-        svfields['ages'] = [216, 220, 30, 40] #40
+        svfields['ages'] = [216, 220, 33, 40] #40
         svfields['refnorth'] = [215, 230, 41, 46] #56
         svfields['egs'] = [210, 220, 50, 55] #31
         svfields['highstardens_n'] = [273, 280, 40, 45] #37
 
+    
+    keep = np.zeros_like(ra, dtype='?')
+    for key, val in zip(svfields.keys(), svfields.values()):
+        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+        
+    return keep
+
+def get_custom_svfields(ra, dec, survey='all'):
+    
+    svfields_n = {}
+    svfields_s = {}
+    
+    #north
+    svfields_n['egs'] = [210, 220, 50, 55] #31
+    svfields_n['refnorth'] = [215, 230, 41, 46] #56
+    svfields_n['highebv_n'] = [140, 150, 65, 70] #19
+    svfields_n['highstardens_ne'] = [273, 283, 40, 45] #37
+    svfields_n['highstardens_nw'] = [120, 130, 40, 60] #37
+    svfields_n['lowstardens_n'] = [160, 180, 50, 60] #37
+
+    #south
+    svfields_s['g09'] = [129, 141, -2.0, 3.0] #60
+    svfields_s['g12'] = [174, 186, -3.0, 2.0] #60
+    svfields_s['g15'] = [211, 224, -2.0, 3.0] #65
+    svfields_s['sagittarius'] = [200, 210, 5, 10] #49
+    svfields_s['lowstardens_s'] = [160, 180, 10, 20] #37
+
+    if survey == 'north':
+        svfields = svfields_n
+    if survey == 'south':
+        svfields = svfields_s
+    if survey == 'all':
+        svfields =  {**svfields_s, **svfields_n}
     
     keep = np.zeros_like(ra, dtype='?')
     for key, val in zip(svfields.keys(), svfields.values()):
@@ -1086,8 +1326,8 @@ def get_msmask(masksources):
 def get_bsmask(masksources):
     
     mag = np.zeros_like(masksources['RA'])
-    ingaia = (masksources['REF_CAT'] == b'G2') & (masksources['G'] <= 13)
-    intycho = (masksources['REF_CAT'] == b'T2')
+    ingaia = (masksources['REF_CAT'] == 'G2') & (masksources['G'] <= 13)
+    intycho = (masksources['REF_CAT'] == 'T2')
     
     # get MAG_VT mag from Tycho
     path = '/global/homes/q/qmxp55/DESI/matches/'
@@ -1162,6 +1402,9 @@ def query_catalog_mask(ra, dec, starCat, radii, nameMag='MAG_VT', diff_spikes=Tr
 
     ra2, dec2 = map(np.copy, [ra, dec])
     sky2 = SkyCoord(ra2*u.degree,dec2*u.degree, frame='icrs')
+    
+    widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(w1_bins)-1).start()
 
     for index in range(len(w1_bins)-1):
 
@@ -1228,6 +1471,9 @@ def query_catalog_mask(ra, dec, starCat, radii, nameMag='MAG_VT', diff_spikes=Tr
 
             if log: print('{} objects masked'.format(np.sum(circ_contam)))
             if log: print()
+                
+        time.sleep(0.1)
+        bar.update(index + 1)
 
     if not diff_spikes:
         cat_flag = circ_flag
@@ -1276,12 +1522,13 @@ def LSLGA_veto(cat=None, LSLGA=None, radii='D25', N=1):
     
     end = time.time()
     print('Total run time: %f sec' %(end - start))
-    
+     
     return mask
 
 
 def match_gama(cat=None, gama=None):
     
+    #if maskcat is None: maskcat = np.ones_like(cat, dtype=bool)
     # matching LS with gama stars and galaxies
     idx20, idx10, d2d0, d_ra0, d_dec0 = match_coord(cat['RA'], cat['DEC'], 
                                                                 gama['RA'], gama['DEC'], search_radius=1)

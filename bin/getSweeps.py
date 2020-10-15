@@ -40,4 +40,4 @@ print('rlim', ns.rlim)
 #print('filepath', ns.f)
 #print('===========')
 
-cat =  get_sweep_whole(patch=patch, dr=ns.dr, rlimit=rlim, maskbitsource=False, bgsbits=False, opt='1', sweepdir=ns.OF)
+cat =  get_sweep_whole(patch=patch, dr=ns.dr, rlimit=rlim, maskbitsource=False, bgsbits=False, opt='2', sweepdir=ns.OF)
