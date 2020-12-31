@@ -397,7 +397,7 @@ def masking(title, submasks, details):
 def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', ylab=True, xlab=True, vline=None, 
            hline=None, fig=None, gs=None, xlim=None, ylim=None, vmin=None, vmax=None, mincnt=1, fmcline=False, 
                file=None, gridsize=(60,60), comp=False, fracs=False, area=None, cbar=None, clab=None, 
-                   contour1=None, contour2=None, levels1=None, levels2=None, showmedian=False, plothist=False,
+                   contour1=None, contour2=None, levels1=None, levels2=None, showmedian=False, percentiles=True, plothist=False,
                         reduce_C_function=None):
     
     x, y = coord.keys()
@@ -413,8 +413,10 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         ax = fig.add_axes(main, gs[n])
     else:
         ax = fig.add_subplot(gs[n])
+        
+    ax.tick_params(labelsize=20)
     
-    if title is not None: ax.set_title(r'%s' %(title), size=20)
+    if title is not None: ax.set_title(r'%s' %(title), size=25)
     if xlim is None: xlim = limits()[x]
     if ylim is None: ylim = limits()[y]
     masklims = (coord[x] > xlim[0]) & (coord[x] < xlim[1]) & (coord[y] > ylim[0]) & (coord[y] < ylim[1])
@@ -429,8 +431,12 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
         masklow = (masklims) & (coord[y] < hline) & (catmask)
         maskgal = (~masklow) & (catmask)
         
-    pos = ax.hexbin(coord[x][keep], coord[y][keep], C=C, gridsize=gridsize, cmap=cmap, 
+    if reduce_C_function is not None:
+        pos = ax.hexbin(coord[x][keep], coord[y][keep], C=C, gridsize=gridsize, cmap=cmap, 
                     vmin=vmin, vmax=vmax, bins=bins, mincnt=mincnt, alpha=0.8, reduce_C_function=reduce_C_function)
+    else:
+        pos = ax.hexbin(coord[x][keep], coord[y][keep], C=C, gridsize=gridsize, cmap=cmap, 
+                    vmin=vmin, vmax=vmax, bins=bins, mincnt=mincnt, alpha=0.8)
     
     dx = np.abs(xlim[1] - xlim[0])/15.
     dy = np.abs(ylim[1] - ylim[0])/15.
@@ -510,7 +516,7 @@ def hexbin(coord, catmask, n, C=None, bins=None, title=None, cmap='viridis', yla
                 continue
         
         ax.plot(binc, median, lw=2, c='r')
-        ax.fill_between(binc, upper, lower, facecolor='gray', alpha=0.5)
+        if percentiles: ax.fill_between(binc, upper, lower, facecolor='gray', alpha=0.5)
         
     if plothist:
         
@@ -613,7 +619,7 @@ def get_systplot(systquant):
     return tmparray[tmpind,1], tmparray[tmpind,2]
 
 #
-def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False, cols=None, overbyreg=True, percentiles=[1,99], get_values=False):
+def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20, clip=False, denslims=False, ylab=True, text=None, weights=False, nside=256, fig=None, gs=None, label=False, ws=None, title=None, onlyweights=False, cols=None, overbyreg=True, percentiles=[1,99], get_values=False, labels_size=(18,20), regs_dict=None):
     
     pixarea = hp.nside2pixarea(nside,degrees=True)
 
@@ -645,8 +651,8 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
     delta = (xlim[1] - xlim[0])/15.
     if text is not None: ax.text(xlim[0]+delta, 1.15, text, fontsize=15)
         
-    if ylab: ax.set_ylabel(r'$\eta$ / $\overline{\eta}$',fontsize=20)
-    ax.set_xlabel(xlabel,fontsize=18)
+    if ylab: ax.set_ylabel(r'$\eta$ / $\overline{\eta}$',fontsize=labels_size[1])
+    ax.set_xlabel(xlabel,fontsize=labels_size[0])
     ax.grid(True)
     #title = []
     #if clip: title.append('clipped')
@@ -719,9 +725,13 @@ def plot_sysdens(hpdicttmp, namesels, regs, syst, mainreg, xlim=None, n=0, nx=20
             plotxgrid, systv, systverr, xgrid = pixcorr(x=systquant, y=systdens, nx=nx, xlim=xlim)
         
             if label:
-                if reg == 'south': lab = 'DECaLS+DES'+' & '+namesel
-                elif reg == 'north': lab = 'BASS/MzLS'+' & '+namesel
-                else: lab = reg+' & '+namesel
+                if regs_dict is not None:
+                    lab = regs_dict[reg]
+                else:
+                    
+                    if reg == 'south': lab = 'DECaLS+DES'+' & '+namesel
+                    elif reg == 'north': lab = 'BASS/MzLS'+' & '+namesel
+                    else: lab = reg+' & '+namesel
             else: lab = None
             
             if (len(regs) < 2) & (len(namesel) < 2): newcol, lw, alpha = 'k', 1, 1.0
@@ -846,7 +856,7 @@ def mollweide(hpdict=None, C=None, namesel=None, reg=None, nside=256, projection
     # mollweide
     
     ax     = plt.subplot(gs[n],projection=projection)
-    if title is not None: ax.set_title(title, size=18)
+    if title is not None: ax.set_title(title, size=24)
     _      = set_mwd(ax,org=org)
     SC  = ax.scatter(ramw[mainreg],decmw[mainreg],s=1,
         c=hpdens[mainreg],
@@ -964,7 +974,7 @@ def mycmap(name,n,cmin,cmax):
 
 def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14,4), radii_2=None, 
                 grid=None, SR=[2, 240.], scaling=False, nbins=101, SR_scaling=4, logDenRat=[-3, 3], 
-                    radii_bestfit=True, annulus=None, bintype='2', filename=None, log=False):
+                    radii_bestfit=True, annulus=None, bintype='2', filename=None, log=False, gal_radii=None):
     '''
     Get scatter and density plots of objects of cat1 around objects of cat2 within a search radius in arcsec.
 
@@ -981,6 +991,10 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
     ------
     (distance (arcsec), density) if density=True
     '''
+    
+    if (gal_radii is not None) & (not scaling):
+        raise ValueError('Galaxies allows the reescaling mode only.')
+        
     from io_ import search_around #if issues with this, comment it run notebook and then uncomment it and run notebook again
     # define the slit width for estimating the overdensity off diffraction spikes
     slit_width = slitw
@@ -1060,16 +1074,18 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
             raise ValueError('Invaid bintype. Choose bintype = 0, 1, 2')
 
         if log: print(title)
-        if bintype != '1':
-            magminrad = circular_mask_radii_func([mag_bins[index+1]], radii_1, bestfit=radii_bestfit)[0]
-            magmaxrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
-        else:
-            if index == 0:
-                magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
-                magmaxrad = magminrad
+            
+        if gal_radii is None:
+            if bintype != '1':
+                magminrad = circular_mask_radii_func([mag_bins[index+1]], radii_1, bestfit=radii_bestfit)[0]
+                magmaxrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
             else:
-                magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
-                magmaxrad = circular_mask_radii_func([mag_bins[index-1]], radii_1, bestfit=radii_bestfit)[0]
+                if index == 0:
+                    magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+                    magmaxrad = magminrad
+                else:
+                    magminrad = circular_mask_radii_func([mag_bins[index]], radii_1, bestfit=radii_bestfit)[0]
+                    magmaxrad = circular_mask_radii_func([mag_bins[index-1]], radii_1, bestfit=radii_bestfit)[0]
 
         if log: print('MARK #1')
             
@@ -1092,7 +1108,12 @@ def overdensity(cat, star, radii_1, nameMag, slitw, density=False, magbins=(8,14
         
         #print('%d sources ~%g %% ' %(Nsources, perc_sources))
         
-        mag_radii = circular_mask_radii_func(star[nameMag][mask_star][idx2], radii_1, bestfit=radii_bestfit)
+        if gal_radii is not None:
+            mag_radii = gal_radii[mask_star][idx2]
+            magmaxrad = mag_radii.max()
+            magminrad = mag_radii.min()
+        else:
+            mag_radii = circular_mask_radii_func(star[nameMag][mask_star][idx2], radii_1, bestfit=radii_bestfit)
         #print(len(d_ra), len(mag_radii))
         if log: print('mag_radii MAX:',mag_radii.max(), 'mag_radii MIN:',mag_radii.min())
         if log: print('mag MAX:',star[nameMag][mask_star][idx2].max(), 'mag MIN:',star[nameMag][mask_star][idx2].min())
@@ -1422,7 +1443,7 @@ def plot_venn3(A, B, C, norm=None, labels=None, file=None, title=None, colors=No
     a7 = round(np.sum(ABC)/norm, sf)
         
     if labels is None: labels = ['Group A', 'Group B', 'Group C']
-    if colors is None: colors = ['r', 'green', 'b']
+    if colors is None: colors = ['r', 'green', 'royalblue']
         
     fig = plt.figure(figsize=(7,7))
     v=venn3([a1, a2, a3, a4, a5, a6, a7], set_labels = (labels[0], labels[1], labels[2]), set_colors=(colors), alpha = 0.6)

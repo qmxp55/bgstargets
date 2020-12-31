@@ -202,7 +202,9 @@ def get_bgs_sv(df, mycat=False):
     bgscuts = geocuts
     bgscuts.update(photcuts)
     
-    bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
+    bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC']
+    #bgslist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
+    bgslist_WQC = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
     #lowlist = ['BS', 'GC', 'nobs', 'SGSV', 'CC', 'QC_FM', 'QC_FI', 'QC_FF']
     bgs_sv = np.ones_like(df['RA'], dtype='?')
     bgs_sv_bright = bgs_sv.copy()
@@ -210,21 +212,30 @@ def get_bgs_sv(df, mycat=False):
     bgs_sv_faint_ext = bgs_sv.copy()
     bgs_sv_fibmag = bgs_sv.copy()
     bgs_sv_lowq = ~bgs_sv.copy()
+    #bgs_sv_lowq_WQC = ~bgs_sv.copy()
     bgs_sv_any = bgs_sv.copy()
     #lowq = ~bgs_sv.copy()
     
     for key in bgslist:
         bgs_sv &= bgscuts[key]
-        if key != 'SGSV': bgs_sv_lowq |= ((bgscuts['SGSV']) & (bgscuts['BS']) & (bgscuts['GC']) & (~bgscuts[key]))
+        #if key != 'SGSV': 
+        #    bgs_sv_lowq |= ((bgscuts['SGSV']) & (bgscuts['BS']) & (bgscuts['GC']) & (~bgscuts[key]))
+    
+    # This add the QCs to lowq sample
+    for key in bgslist_WQC:
+        if key != 'SGSV': 
+            bgs_sv_lowq |= ((bgscuts['SGSV']) & (bgscuts['BS']) & (bgscuts['GC']) & (~bgscuts[key]))
         
     bgs_sv_bright = (bgs_sv) & (rmag < 19.5)
     bgs_sv_faint = (bgs_sv) & (rmag >= 19.5) & (rmag < 20.1)
     bgs_sv_faint_ext = (bgs_sv) & (rmag >= 20.1) & (rmag < 20.5) & (rfibmag > 21.0511)
-    bgs_sv_fibmag = (bgs_sv) & (rmag >= 20.1) & (rfibmag < 21.0511)
+    bgs_sv_fibmag = (bgs_sv) & (rmag >= 20.1) & (rmag < 20.5) & (rfibmag < 21.0511)
     bgs_sv_lowq &= (rmag < 20.1)
+    #bgs_sv_lowq_WQC &= (rmag < 20.1)
     bgs_sv_any = (bgs_sv_bright) | (bgs_sv_faint) | (bgs_sv_faint_ext) | (bgs_sv_fibmag) | (bgs_sv_lowq)
+    #bgs_sv_any_WQC = (bgs_sv_bright) | (bgs_sv_faint) | (bgs_sv_faint_ext) | (bgs_sv_fibmag) | (bgs_sv_lowq_WQC)
         
-    return bgs_sv_any, bgs_sv_bright, bgs_sv_faint, bgs_sv_faint_ext, bgs_sv_fibmag, bgs_sv_lowq
+    return bgs_sv_any, bgs_sv_bright, bgs_sv_faint, bgs_sv_faint_ext, bgs_sv_fibmag, bgs_sv_lowq #, bgs_sv_any_WQC, bgs_sv_lowq_WQC
 
 def get_stars(gaiagmag, fluxr):
     

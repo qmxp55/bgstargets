@@ -1,4 +1,4 @@
-#
+ #
 import numpy as np
 import sys, os, time, argparse, glob
 import fitsio
@@ -162,7 +162,10 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=
                 'bgs_sv_faint':bgs_sv_faint,
                 'bgs_sv_faint_ext':bgs_sv_faint_ext,
                 'bgs_sv_fibmag':bgs_sv_fibmag,
-                'bgs_sv_lowq':bgs_sv_lowq}
+                'bgs_sv_lowq':bgs_sv_lowq
+                #'bgs_sv_any_wqc':bgs_sv_any_wqc,
+                #'bgs_sv_lowq_wqc':bgs_sv_lowq_wqc
+               }
             
     for num, key in enumerate(BGSsel.keys()):
         BGSBITS |= BGSsel[key] * 2**(20+num)
@@ -192,7 +195,7 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=
     return tab
     
 
-def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False, bgsbits=False, opt='1', sweepdir='/global/cscratch1/sd/qmxp55/bgstargets_output/'):
+def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False, bgsbits=False, opt='1', sweepdir='/global/cscratch1/sd/qmxp55/bgstargets_output/', cols=None):
     """
     Extract data from DECaLS DR7 SWEEPS files only.
     
@@ -221,37 +224,40 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     elif (len(namelab) > 0) & (patch is not None): sweep_file_name = '%s_sweep_%s' %(dr, '_'.join(namelab))
     else: sweep_file_name = '%s_sweep_whole' %(dr)
         
+    
+    if cols is None:    
         
-    if dr[:4] == 'dr9k':
-        
-        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
-                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
-                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
-                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
-                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
-                                           'SHAPE_E1', 'SHAPE_E1_IVAR']
-        
-        
-    elif dr[:4] == 'dr9m':
-        
-        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
-                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
-                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
-                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
-                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
-                                           'SHAPE_E1', 'SHAPE_E1_IVAR', 'SHAPE_E2', 'SHAPE_E2_IVAR', 'SERSIC', 'SERSIC_IVAR',
-                                               'RELEASE', 'BRICKID', 'BRICKNAME', 'OBJID', 'FITBITS']
-    else:
-        
-        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+        if dr[:4] == 'dr9k':
+
+            cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
                         'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
                             'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
                                 'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
                                      'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                           'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
-                                               'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
+                                           'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
+                                               'SHAPE_E1', 'SHAPE_E1_IVAR']
+
+
+        elif (dr[:4] == 'dr9m') or (dr[:3] == 'dr9'):
+
+            cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                        'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                            'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                                'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                     'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                           'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
+                                               'SHAPE_E1', 'SHAPE_E1_IVAR', 'SHAPE_E2', 'SHAPE_E2_IVAR', 'SERSIC', 'SERSIC_IVAR',
+                                                   'RELEASE', 'BRICKID', 'BRICKNAME', 'OBJID', 'FITBITS']
+        else:
+
+            cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+                            'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+                                'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+                                    'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+                                         'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+                                               'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
+                                                   'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
+            
         
     sweep_file = os.path.isfile(sweepdir+sweep_file_name+'.npy')
     sweep_dir_dr7 = os.path.join('/global/project/projectdirs/cosmo/data/legacysurvey/','dr7', 'sweep', '7.1')
@@ -273,6 +279,9 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr9knorth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9k/north/sweep'
     sweep_dir_dr9msouth = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/south/sweep'
     sweep_dir_dr9mnorth = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/north/sweep'
+    sweep_dir_dr9north = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9m/north/sweep/9.0'
+    sweep_dir_dr9south = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9m/south/sweep/9.0'
+    
     
     if not sweep_file:
         if dr is 'dr7': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr7, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
@@ -293,6 +302,9 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         elif dr == 'dr9m-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9msouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
         elif dr == 'dr9m-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9mnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
             
+        elif dr == 'dr9-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+            
         #elif (dr is 'dr8') or (dr is 'dr9d'):
         #    if dr is 'dr8':
         #        sweep_north = sweep_dir_dr8north
@@ -309,16 +321,36 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         #    if dfnorth is None: df = dfsouth
         #    elif dfsouth is None: df = dfnorth
         #    else: df = np.concatenate((dfnorth, dfsouth))
-                
+        
+        ''' 
+        files = df
+        catdict = {}
+        
+        for i in files:
+            catdict[i] = np.load(i+'.npy')
+            
+        #print('===== READY TO CONCATENATE =====')
+        df = np.concatenate(tuple(catdict.values()))
+        #print('===== CONCATENATION DONE... =====')
+        '''
+        
         tab = Table()
-        for col in df.dtype.names:
-            if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR'): tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
-            elif col[:2] == 'MW': continue
-            elif col == 'FIBERFLUX_R': tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
-            elif col == 'GAIA_PHOT_G_MEAN_MAG': tab['G'] = df[col]
-            elif col == 'GAIA_ASTROMETRIC_EXCESS_NOISE': tab['AEN'] = df[col]
-            else: tab[col] = df[col]
-        tab['FLUX_R'] = df['FLUX_R']
+        
+        if cols == 'all':
+            
+            for col in df.dtype.names:
+                tab[col] = df[col]
+        
+        else:
+            
+            for col in df.dtype.names:
+                if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR'): tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
+                elif col[:2] == 'MW': continue
+                elif col == 'FIBERFLUX_R': tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
+                elif col == 'GAIA_PHOT_G_MEAN_MAG': tab['G'] = df[col]
+                elif col == 'GAIA_ASTROMETRIC_EXCESS_NOISE': tab['AEN'] = df[col]
+                else: tab[col] = df[col]
+            tab['FLUX_R'] = df['FLUX_R']
         
         # create BGSBITS: bits associated to selection criteria
         if bgsbits:
@@ -346,16 +378,20 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
                     
             # dont forget the magnitude dependance
             #bgs &= flux_to_mag(df['FLUX_R']/df['MW_TRANSMISSION_R']) < 20
+            
             bgs_any, bgs_bright, bgs_faint = get_bgs(df)
             bgs_sv_any, bgs_sv_bright, bgs_sv_faint, bgs_sv_faint_ext, bgs_sv_fibmag, bgs_sv_lowq = get_bgs_sv(df)
             
             BGSsel = {'bgs_any':bgs_any, 'bgs_bright':bgs_bright, 'bgs_faint':bgs_faint}
             BGSSVsel = {'bgs_sv_any':bgs_sv_any, 
-                        'bgs_sv_bright':bgs_sv_bright, 
-                        'bgs_sv_faint':bgs_sv_faint,
-                        'bgs_sv_faint_ext':bgs_sv_faint_ext,
-                        'bgs_sv_fibmag':bgs_sv_fibmag,
-                        'bgs_sv_lowq':bgs_sv_lowq}
+                'bgs_sv_bright':bgs_sv_bright, 
+                'bgs_sv_faint':bgs_sv_faint,
+                'bgs_sv_faint_ext':bgs_sv_faint_ext,
+                'bgs_sv_fibmag':bgs_sv_fibmag,
+                'bgs_sv_lowq':bgs_sv_lowq
+                #'bgs_sv_any_wqc':bgs_sv_any_wqc,
+                #'bgs_sv_lowq_wqc':bgs_sv_lowq_wqc
+               }
             
             for num, key in enumerate(BGSsel.keys()):
                 BGSBITS |= BGSsel[key] * 2**(20+num)
@@ -438,14 +474,18 @@ def get_files_sweeps(sweep_dir=None, patch=None):
 def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='2', cols=None):
     '''Main function to extract the data from the SWEEPS'''
     
-    if cols is None:
-        cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
-                    'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
-                        'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
-                            'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
-                                 'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                       'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
-                                           'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
+    if cols == 'all':
+        
+        cols = None
+    
+#     if cols is None:
+#         cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
+#                     'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+#                         'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
+#                             'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
+#                                  'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
+#                                        'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPEDEV_R', 'SHAPEDEV_R_IVAR',
+#                                            'SHAPEEXP_R', 'SHAPEEXP_R_IVAR']
     
     #sweepfiles = sweepfiles[:2]
     
@@ -534,8 +574,11 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
         print('Total bricks found: \t %i' %(len(sweep_files)))
     
         widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
-        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(sweep_files)).start()
         
+        file_names = []
+            
+        bar = progressbar.ProgressBar(widgets=widgets, max_value=len(sweep_files)).start()
+        catdict = {}
 
         for i, file in enumerate(sweep_files):
 
@@ -566,9 +609,73 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
 
         end = time.time()
         print('Total run time: %f sec' %(end - start))
-            
+        
     if opt == '3':
         print('--------- OPTION 3 ---------')
+        catdict = {}
+        
+        start = time.time()
+        sweep_files = get_files_sweeps(sweep_dir=sweep_dir, patch=patch)
+        
+        #divide sample into N subsamples to make it faster
+        N = 20
+        A = len(sweep_files) // N
+        R = len(sweep_files) - (A * N)
+        #print(A, A * N, R)
+        #print(len(sweep_files))
+
+        B = np.array(sweep_files[:A*N]).reshape(A, N).tolist()
+        if R > 0:
+            B.append(np.array(sweep_files[A*N:]).tolist())
+        
+        print('Total bricks found: \t %i' %(len(sweep_files)))
+    
+        widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
+        
+        file_names = []
+        
+        for num, sample in enumerate(B):
+            
+            bar = progressbar.ProgressBar(widgets=widgets, max_value=len(sample)).start()
+            catdict = {}
+            
+            for i, file in enumerate(sample):
+
+                cat = fitsio.read(file, columns=cols, upper=True, ext=1)
+                if patch is not None:
+                    ramin, ramax, decmin, decmax = patch[0], patch[1], patch[2], patch[3]
+                    cat = cut(ramin, ramax, decmin, decmax, cat)
+
+                if rlimit != None:
+                    keep = np.ones_like(cat, dtype='?')
+                    rflux = cat['FLUX_R'] / cat['MW_TRANSMISSION_R']
+                    keep &= rflux > 10**((22.5-rlimit)/2.5)
+                    if maskbitsource:
+                        keep &= ((cat['REF_CAT'] != '  ') | (cat['REF_CAT'] != b'  '))
+                    catdict[file] = cat[(keep)]
+                    #catdict[file] = cat[(keep)]
+                else:
+                    keep = np.ones_like(cat, dtype='?')
+                    if maskbitsource:
+                        #print('HEREEEEEEE!!!!!!!!')
+                        keep &= ((cat['REF_CAT'] != '  '))
+                    catdict[file] = cat[keep]
+
+                time.sleep(0.1)
+                bar.update(i + 1)
+
+            cat0 = np.concatenate(tuple(catdict.values()))
+            file_name = '/global/cscratch1/sd/qmxp55/bgstargets_output/dr9/tmp_%s' %(str(num))
+            file_names.append(file_name)
+            np.save(file_name, cat0)
+            del cat0
+            print('====== %i / %i DONE... ======' %(num+1, len(B)))
+
+        end = time.time()
+        print('Total run time: %f sec' %(end - start))
+            
+    if opt == '4':
+        print('--------- OPTION 4 ---------')
         cat0 = {}
         for i in cols: cat0[i] = []
         for i, file in enumerate(sweepfiles):
@@ -625,6 +732,8 @@ def bgsmask():
             'bgs_sv_faint_ext': 33,
             'bgs_sv_fibmag': 34,
             'bgs_sv_lowq': 35
+            #'bgs_sv_any_wqc': 36,
+            #'bgs_sv_lowq_wqc': 37
             }
     
     return mask
@@ -691,8 +800,8 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
         
     if (ranindesi is None) and (randoms is not None):
         ranindesi = get_isdesi(randoms['RA'],randoms['DEC'], tiledir=tiledir) # True if is in desi footprint
-    elif (ranindesi is None) and (randoms is None):
-        raise ValueError('include a random catalogue to compute ranindesi.')
+#     elif (ranindesi is None) and (randoms is None):
+#         raise ValueError('include a random catalogue to compute ranindesi.')
         
         
     theta,phi  = hp.pix2ang(nside,np.arange(npix),nest=nest)
@@ -761,25 +870,27 @@ def get_dict(cat=None, randoms=None, pixmapfile=None, hppix_ran=None, hppix_cat=
     hpdict['issouth_n'] = (hpdict['issouth']) & (hpdict['galb']>0)
     hpdict['issouth_s'] = (hpdict['issouth']) & (hpdict['galb']<0)
     
-    hpdict['issvfields'] = get_svfields(hpdict['ra'],hpdict['dec'])
+    hpdict['issvfields'] = get_svfields(hpdict['ra'],hpdict['dec'], survey='all')
     hpdict['issvfields_n'] = (hpdict['issvfields']) & (hpdict['isnorth'])
     hpdict['issvfields_s'] = (hpdict['issvfields']) & (hpdict['issouth'])
     
-    hpdict['issvfields_fg'] = get_svfields_fg(hpdict['ra'],hpdict['dec'])
-    hpdict['issvfields_fg_n'] = (hpdict['issvfields_fg']) & (hpdict['isnorth'])
-    hpdict['issvfields_fg_s'] = (hpdict['issvfields_fg']) & (hpdict['issouth'])
+#     hpdict['issvfields_fg'] = get_svfields_fg(hpdict['ra'],hpdict['dec'])
+#     hpdict['issvfields_fg_n'] = (hpdict['issvfields_fg']) & (hpdict['isnorth'])
+#     hpdict['issvfields_fg_s'] = (hpdict['issvfields_fg']) & (hpdict['issouth'])
     
-    hpdict['issvfields_ij'] = get_svfields_ij(hpdict['ra'],hpdict['dec'], survey='all')
-    hpdict['issvfields_ij_n'] = (hpdict['issvfields_ij']) & (hpdict['isnorth'])
-    hpdict['issvfields_ij_s'] = (hpdict['issvfields_ij']) & (hpdict['issouth'])
+#     hpdict['issvfields_ij'] = get_svfields_ij(hpdict['ra'],hpdict['dec'], survey='all')
+#     hpdict['issvfields_ij_n'] = (hpdict['issvfields_ij']) & (hpdict['isnorth'])
+#     hpdict['issvfields_ij_s'] = (hpdict['issvfields_ij']) & (hpdict['issouth'])
     
-    hpdict['issvfields_k'] = get_svfields_k(hpdict['ra'],hpdict['dec'], survey='all')
-    hpdict['issvfields_k_n'] = (hpdict['issvfields_k']) & (hpdict['isnorth'])
-    hpdict['issvfields_k_s'] = (hpdict['issvfields_k']) & (hpdict['issouth'])
+#     hpdict['issvfields_k'] = get_svfields_k(hpdict['ra'],hpdict['dec'], survey='all')
+#     hpdict['issvfields_k_n'] = (hpdict['issvfields_k']) & (hpdict['isnorth'])
+#     hpdict['issvfields_k_s'] = (hpdict['issvfields_k']) & (hpdict['issouth'])
     
-    regs = ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s', 
-           'svfields_fg', 'svfields_fg_n', 'svfields_fg_s', 'svfields_ij', 'svfields_ij_n', 'svfields_ij_s',
-           'svfields_k', 'svfields_k_n', 'svfields_k_s']
+#     regs = ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s', 
+#            'svfields_fg', 'svfields_fg_n', 'svfields_fg_s', 'svfields_ij', 'svfields_ij_n', 'svfields_ij_s',
+#            'svfields_k', 'svfields_k_n', 'svfields_k_s']
+    
+    regs = ['south','decals','des','north', 'south_n', 'south_s', 'svfields', 'svfields_n', 'svfields_s']
     
     #hpdict['istest'] = (hpdict['ra'] > 160.) & (hpdict['ra'] < 230.) & (hpdict['dec'] > -2.) & (hpdict['dec'] < 18.)
     if log: print('regions DONE...')
@@ -985,11 +1096,15 @@ def get_random(N=3, sweepsize=None, dr='dr8', dirpath='/global/cscratch1/sd/qmxp
         elif (dr == 'dr9m'):
             ranpath = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/0.42.0/randoms/resolve/'
             randoms = glob.glob(ranpath + 'randoms*')
+        elif (dr == 'dr9'):
+            ranpath = '/global/cfs/cdirs/desi/target/catalogs/dr9m/0.44.0/randoms/resolve/'
+            randoms = glob.glob(ranpath + 'randoms*')
         
             
         if len(randoms) > 1: randoms.sort()
         if dr == 'dr8': randoms = randoms[0:N]
         if dr == 'dr9m': randoms = randoms[0:N]
+        if dr == 'dr9': randoms = randoms[0:N]
 
         for i in range(len(randoms)):
             df_ran = fitsio.read(randoms[i], columns=['RA', 'DEC', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'MASKBITS'],upper=True, ext=1)
@@ -1156,31 +1271,31 @@ def get_reg(reg='decals', hppix=None):
     
     return regcat
 
-def get_svfields(ra, dec):
+# def get_svfields(ra, dec):
     
-    svfields = {}
+#     svfields = {}
 
-    svfields['s82'] = [30, 40, -7, 2.0] #90
-    svfields['egs'] = [210, 220, 50, 55] #31
-    svfields['g09'] = [129, 141, -2.0, 3.0] #60
-    svfields['g12'] = [174, 186, -3.0, 2.0] #60
-    svfields['g15'] = [211, 224, -2.0, 3.0] #65
-    svfields['overlap'] = [135, 160, 30, 35] #104
-    svfields['refnorth'] = [215, 230, 41, 46] #56
-    svfields['ages'] = [215, 220, 30, 40] #40
-    svfields['sagittarius'] = [200, 210, 5, 10] #49
-    svfields['highebv_n'] = [140, 150, 65, 70] #19
-    svfields['highebv_s'] = [240, 245, 20, 25] #23
-    svfields['highstardens_n'] = [273, 283, 40, 45] #37
-    svfields['highstardens_s'] = [260, 270, 15, 20] #47
-    svfields['s82_s'] = [330, 340, -2, 3] #51
+#     svfields['s82'] = [30, 40, -7, 2.0] #90
+#     svfields['egs'] = [210, 220, 50, 55] #31
+#     svfields['g09'] = [129, 141, -2.0, 3.0] #60
+#     svfields['g12'] = [174, 186, -3.0, 2.0] #60
+#     svfields['g15'] = [211, 224, -2.0, 3.0] #65
+#     svfields['overlap'] = [135, 160, 30, 35] #104
+#     svfields['refnorth'] = [215, 230, 41, 46] #56
+#     svfields['ages'] = [215, 220, 30, 40] #40
+#     svfields['sagittarius'] = [200, 210, 5, 10] #49
+#     svfields['highebv_n'] = [140, 150, 65, 70] #19
+#     svfields['highebv_s'] = [240, 245, 20, 25] #23
+#     svfields['highstardens_n'] = [273, 283, 40, 45] #37
+#     svfields['highstardens_s'] = [260, 270, 15, 20] #47
+#     svfields['s82_s'] = [330, 340, -2, 3] #51
     
     
-    keep = np.zeros_like(ra, dtype='?')
-    for key, val in zip(svfields.keys(), svfields.values()):
-        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+#     keep = np.zeros_like(ra, dtype='?')
+#     for key, val in zip(svfields.keys(), svfields.values()):
+#         keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
         
-    return keep
+#     return keep
 
 def get_svfields_fg(ra, dec):
     
@@ -1260,6 +1375,44 @@ def get_svfields_k(ra, dec, survey='all'):
         svfields['egs'] = [210, 220, 50, 55] #31
         svfields['highstardens_n'] = [273, 280, 40, 45] #37
 
+    
+    keep = np.zeros_like(ra, dtype='?')
+    for key, val in zip(svfields.keys(), svfields.values()):
+        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+        
+    return keep
+
+def get_svfields(ra, dec, survey='all', dec_resol_ns=32.375):
+    
+    svfields_n = {}
+    svfields_s = {}
+    
+    #north
+    svfields_n['ages_n'] = [215, 220, dec_resol_ns, 40] #40
+    svfields_n['overlap_n'] = [135, 160, dec_resol_ns, 35] #104
+    svfields_n['egs'] = [210, 220, 50, 55] #31
+    svfields_n['refnorth'] = [215, 230, 41, 46] #56
+    svfields_n['highebv_n'] = [140, 150, 65, 70] #19
+    svfields_n['highstardens_n'] = [273, 283, 40, 45] #37
+    
+    #south
+    svfields_s['s82_s'] = [330, 340, -2, 3] #51
+    svfields_s['highstardens_s'] = [260, 270, 15, 20] #47
+    svfields_s['highebv_s'] = [240, 245, 20, 25] #23
+    svfields_s['ages_s'] = [215, 220, 30, dec_resol_ns] #40
+    svfields_s['overlap_s'] = [135, 160, 30, dec_resol_ns] #104
+    svfields_s['s82'] = [30, 40, -7, 2.0] #90
+    svfields_s['g09'] = [129, 141, -2.0, 3.0] #60
+    svfields_s['g12'] = [174, 186, -3.0, 2.0] #60
+    svfields_s['g15'] = [211, 224, -2.0, 3.0] #65
+    svfields_s['sagittarius'] = [200, 210, 5, 10] #49
+
+    if survey == 'north':
+        svfields = svfields_n
+    if survey == 'south':
+        svfields = svfields_s
+    if survey == 'all':
+        svfields = {**svfields_s, **svfields_n}
     
     keep = np.zeros_like(ra, dtype='?')
     for key, val in zip(svfields.keys(), svfields.values()):

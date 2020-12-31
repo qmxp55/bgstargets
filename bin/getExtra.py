@@ -13,6 +13,7 @@ from astropy.coordinates import SkyCoord
 import astropy.units as units
 from astropy.table import Table
 import time
+import fitsio
 
 import warnings
 warnings.filterwarnings('ignore')
