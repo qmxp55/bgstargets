@@ -10,7 +10,7 @@ import astropy.units as units
 from astropy import units as u
 from veto import veto, veto_ellip, match
 
-from cuts import getGeoCuts, getPhotCuts, get_bgs, get_bgs_sv
+from cuts import getGeoCuts, getPhotCuts, get_bgs, get_bgs_sv, get_bgs_sv3, get_galaxies_sv, get_bgs_1percent
 
 #from QA import circular_mask_radii_func
 
@@ -106,15 +106,120 @@ def get_tractor(tractor_path=None, patches=None, outdir=None, rlimit=None, opt='
 
     return cat
 
-def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=False):
+def pull_files(path=None, output=None, survey=None, nside=None, dec_resol_ns=None, verbose=False, debug=False):
+
+    import glob
+    files = sorted(glob.glob(os.path.join(path, '*.npy')))
+    
+    #remove checkpoint file from list
+    for i in files:
+        if 'checkpoint.npy' in i:
+            files.remove(i)
+            
+    if debug:
+        files = files[:2]
+        
+    catdict = {}
+    tab = Table()
+    
+    widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=len(files)).start()
+    
+    for i, file in enumerate(files):
+        
+        
+        #df = np.load(file)
+        df = getBGSbits(cat=None, mycatpath=file, outdir=None, mycat=True, getmycat=True, tractor=False)
+        
+        Grr = df['G'] - 22.5 + 2.5*np.log10(df['FLUX_R'])
+        psftype = df['TYPE']
+        psflike = ((psftype == 'PSF') | (psftype == b'PSF') | (psftype == 'PSF ') | (psftype == b'PSF '))
+
+        keep = np.zeros(len(df), dtype=bool)
+        
+        keep |= get_galaxies_sv(gaiagmag=df['G'], fluxr=df['FLUX_R'], psflike=psflike)
+        keep |= (df['ZMAG'] - df['W2MAG'] - (df['GMAG'] - df['RMAG']) > -1)
+        #if verbose: print('selection / total = \t %.2f %%' %(100 * np.sum(keep) / len(keep)))
+        catdict[file] = df[keep]
+        
+#         for key, val in bgsmask().items():
+
+#             if key not in ['SG', 'SGSV']:
+#                 if val < 20:
+#                     mask = ((df['BGSBITS'] & 2**(val)) == 0)
+#                 else:
+#                     mask = ((df['BGSBITS'] & 2**(val)) != 0)
+
+#                 keep |= mask
+        
+        #print('%s DONE...' %(file))
+        
+        time.sleep(0.1)
+        bar.update(i + 1)
+
+    del df, keep
+
+    #concatenate files
+    cat = np.concatenate(tuple(catdict.values()))
+
+    #angle to healpy pixels array
+    hppix = hp.ang2pix(nside,(90.-cat['DEC'])*np.pi/180.,cat['RA']*np.pi/180.,nest=True)
+    if verbose: print('healpix DONE...')
+    c = SkyCoord(cat['RA']*units.degree,cat['DEC']*units.degree, frame='icrs')
+    b = c.galactic.b.value # galb coordinate
+    l = c.galactic.l.value # galb coordinate
+    if verbose: print('galactic coordinates DONE...')
+
+    if survey == 'north':
+        mask = (cat['DEC'] > dec_resol_ns) & (b > 0)
+    elif survey == 'south':
+        mask = ((cat['DEC'] < dec_resol_ns) & (b > 0)) | (b < 0)
+    else:
+        raise ValueError('%s is not a valid imput.' %(survey))
+
+    tab['hppix'] = hppix[mask]
+    tab['b'] = b[mask]
+    tab['l'] = l[mask]
+    cat = cat[mask]
+
+    if verbose: print('Resolve north and south DONE...')
+
+    regs = ['des', 'decals', 'north', 'desi', 'south']
+    for i in regs:
+        reg_ = get_reg(reg=i, hppix=hppix[mask])
+        tab[i] = reg_
+        if verbose: print(i, 'DONE...')
+
+    del reg_, hppix, b, l, mask    
+
+    if verbose: print('hppix, b and l DONE...')
+
+    for col in cat.dtype.names:
+        tab[col] = cat[col]
+
+    del cat
+    if verbose: print('cols DONE...')
+
+    np.save(output, tab)
+    #tab.write(output+'.fits', format='fits', overwrite=True)
+
+    return tab
+
+
+def getBGSbits(cat=None, mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=False, verbose=False, south=True):
     
     import time
     start = time.time()
     
-    if mycatpath[-4:] == 'fits':
-        df = fitsio.read(mycatpath)
+    if mycatpath is not None:
+    
+        if mycatpath[-4:] == 'fits':
+            df = fitsio.read(mycatpath)
+        else:
+            df = np.load(mycatpath)
+            
     else:
-        df = np.load(mycatpath)
+        df = cat
         
         
     tab = Table()
@@ -122,19 +227,27 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=
     if getmycat:
         for col in df.dtype.names:
             #if tractor: col = col.upper()
-            if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR') & (col[:6] != 'FLUX_W'): tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
-            elif col[:2] == 'MW': continue
-            elif col == 'FIBERFLUX_R': tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
+            if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR') & (col[:6] != 'FLUX_W'): 
+                tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
+                tab[col] = df[col]
+            elif (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR') & (col[:6] == 'FLUX_W'): 
+                tab[col[-2:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-2:]]/df['MW_TRANSMISSION_'+col[-2:]])
+                tab[col] = df[col]
+            #elif col[:2] == 'MW': continue
+            elif col == 'FIBERFLUX_R': 
+                tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
+                tab[col] = df[col]
             elif col == 'GAIA_PHOT_G_MEAN_MAG': tab['G'] = df[col]
             elif col == 'GAIA_ASTROMETRIC_EXCESS_NOISE': tab['AEN'] = df[col]
             else: tab[col] = df[col]
-        tab['FLUX_R'] = df['FLUX_R']
+#         for col in ['FLUX_R', 'FLUX_W1', 'FLUX_W2']:
+#             tab[col] = df[col]
     else:
         for col in df.dtype.names:
             #if not tractor: col = col.upper()
             #col = col.upper()
             if col == 'BGSBITS': continue
-            tab[col.upper()] = df[col]
+            tab[col] = df[col]
             
     # create BGSBITS: bits associated to selection criteria
   
@@ -146,16 +259,18 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=
     BGSBITS = np.zeros_like(tab['RA'], dtype='i8')
     BGSMASK = {}
             
-    print('---- BGSMASK key: ---- ')
+    if verbose: print('---- BGSMASK key: ---- ')
     for bit, key in enumerate(bgscuts.keys()):
                 
         BGSBITS |= bgscuts[key] * 2**(bit)
         BGSMASK[key] = bit
-        print('\t %s, %i, %i' %(key, bit, 2**bit))
+        if verbose: print('\t %s, %i, %i' %(key, bit, 2**bit))
 
     bgs_any, bgs_bright, bgs_faint = get_bgs(tab, mycat=mycat)
     bgs_sv_any, bgs_sv_bright, bgs_sv_faint, bgs_sv_faint_ext, bgs_sv_fibmag, bgs_sv_lowq = get_bgs_sv(tab, mycat=mycat)
-            
+#     bgs_sv3_any, bgs_sv3_bright, bgs_sv3_faint, bgs_sv3_wise = get_bgs_sv3(tab, mycat=mycat, south=south)
+    bgs_1perc_any, bgs_1perc_bright, bgs_1perc_faint, bgs_1perc_wise = get_bgs_1percent(tab, mycat=mycat, south=south)
+    
     BGSsel = {'bgs_any':bgs_any, 'bgs_bright':bgs_bright, 'bgs_faint':bgs_faint}
     BGSSVsel = {'bgs_sv_any':bgs_sv_any, 
                 'bgs_sv_bright':bgs_sv_bright, 
@@ -166,36 +281,47 @@ def getBGSbits(mycatpath=None, outdir=None, mycat=True, getmycat=False, tractor=
                 #'bgs_sv_any_wqc':bgs_sv_any_wqc,
                 #'bgs_sv_lowq_wqc':bgs_sv_lowq_wqc
                }
+    BGS1percsel = {'bgs_any':bgs_1perc_any, 'bgs_bright':bgs_1perc_bright, 'bgs_faint':bgs_1perc_faint, 'bgs_wise':bgs_1perc_wise}
             
     for num, key in enumerate(BGSsel.keys()):
         BGSBITS |= BGSsel[key] * 2**(20+num)
         BGSMASK[key] = 20+num
-        print('\t %s, %i, %i' %(key, 20+num, 2**(20+num)))
+        if verbose: print('\t %s, %i, %i' %(key, 20+num, 2**(20+num)))
                 
     for num, key in enumerate(BGSSVsel.keys()):
         BGSBITS |= BGSSVsel[key] * 2**(30+num)
         BGSMASK[key] = 30+num
-        print('\t %s, %i, %i' %(key, 30+num, 2**(30+num)))
+        if verbose: print('\t %s, %i, %i' %(key, 30+num, 2**(30+num)))
+            
+    for num, key in enumerate(BGS1percsel.keys()):
+        BGSBITS |= BGS1percsel[key] * 2**(40+num)
+        BGSMASK[key] = 40+num
+        if verbose: print('\t %s, %i, %i' %(key, 40+num, 2**(40+num)))
             
     tab['BGSBITS'] = BGSBITS
             
     # sanity check...
-    print('---- Sanity Check ---- ')
+    if verbose: print('---- Sanity Check ---- ')
     for bit, key in zip(BGSMASK.values(), BGSMASK.keys()):
-        if key in list(BGSsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
-        elif key in list(BGSSVsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSSVsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
-        else: print('\t %s, %i, %i' %(key, np.sum(bgscuts[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+        if key in list(BGSsel.keys()): 
+            if verbose: print('\t %s, %i, %i' %(key, np.sum(BGSsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+        elif key in list(BGSSVsel.keys()): 
+            if verbose: print('\t %s, %i, %i' %(key, np.sum(BGSSVsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+        elif key in list(BGS1percsel.keys()): 
+            if verbose: print('\t %s, %i, %i' %(key, np.sum(BGS1percsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+        else: 
+            if verbose: print('\t %s, %i, %i' %(key, np.sum(bgscuts[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
            
     if outdir is not None:
         np.save(outdir, tab)
 
     end = time.time()
-    print('Total run time: %f sec' %(end - start))
+    if verbose: print('Total run time: %f sec' %(end - start))
     
     return tab
     
 
-def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False, bgsbits=False, opt='1', sweepdir='/global/cscratch1/sd/qmxp55/bgstargets_output/', cols=None):
+def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False, bgsbits=False, opt='1', sweepdir='/global/cscratch1/sd/qmxp55/bgstargets_output/', cols=None, debug=False, use_check=False):
     """
     Extract data from DECaLS DR7 SWEEPS files only.
     
@@ -240,14 +366,15 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
 
         elif (dr[:4] == 'dr9m') or (dr[:3] == 'dr9'):
 
-            cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
-                        'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z','MASKBITS', 'REF_CAT', 'REF_ID', 
+            cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FLUX_W1', 'FLUX_W2', 'FLUX_W3', 'FLUX_W4',
+                    'FIBERFLUX_R', 'FIBERTOTFLUX_R','MW_TRANSMISSION_R', 'MW_TRANSMISSION_G', 'MW_TRANSMISSION_Z', 'MW_TRANSMISSION_W1',
+                        'MW_TRANSMISSION_W2', 'MW_TRANSMISSION_W3', 'MW_TRANSMISSION_W4', 'MASKBITS', 'REF_CAT', 'REF_ID', 
                             'GAIA_PHOT_G_MEAN_MAG', 'GAIA_ASTROMETRIC_EXCESS_NOISE', 'FRACFLUX_G', 
                                 'FRACFLUX_R', 'FRACFLUX_Z', 'FRACMASKED_G', 'FRACMASKED_R', 'FRACMASKED_Z',
                                      'FRACIN_G', 'FRACIN_R', 'FRACIN_Z', 'TYPE', 'FLUX_IVAR_R', 'FLUX_IVAR_G',
-                                           'FLUX_IVAR_Z', 'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR',
-                                               'SHAPE_E1', 'SHAPE_E1_IVAR', 'SHAPE_E2', 'SHAPE_E2_IVAR', 'SERSIC', 'SERSIC_IVAR',
-                                                   'RELEASE', 'BRICKID', 'BRICKNAME', 'OBJID', 'FITBITS']
+                                           'FLUX_IVAR_Z', 'FLUX_IVAR_W1', 'FLUX_IVAR_W2', 'FLUX_IVAR_W3', 'FLUX_IVAR_W4', 
+                                                'NOBS_G', 'NOBS_R', 'NOBS_Z', 'SHAPE_R', 'SHAPE_R_IVAR','SHAPE_E1', 'SHAPE_E1_IVAR', 
+                                                    'SHAPE_E2', 'SHAPE_E2_IVAR', 'SERSIC', 'SERSIC_IVAR', 'RELEASE', 'BRICKID', 'BRICKNAME', 'OBJID', 'FITBITS']
         else:
 
             cols = ['RA', 'DEC', 'FLUX_R', 'FLUX_G', 'FLUX_Z', 'FIBERFLUX_R', 'MW_TRANSMISSION_R', 
@@ -279,8 +406,8 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     sweep_dir_dr9knorth = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9k/north/sweep'
     sweep_dir_dr9msouth = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/south/sweep'
     sweep_dir_dr9mnorth = '/global/cscratch1/sd/adamyers/dr9m-sep26-2020/north/sweep'
-    sweep_dir_dr9north = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9m/north/sweep/9.0'
-    sweep_dir_dr9south = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9m/south/sweep/9.0'
+    sweep_dir_dr9north = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9/north/sweep/9.0'
+    sweep_dir_dr9south = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9/south/sweep/9.0'
     
     
     if not sweep_file:
@@ -302,8 +429,8 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         elif dr == 'dr9m-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9msouth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
         elif dr == 'dr9m-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9mnorth, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
             
-        elif dr == 'dr9-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
-        elif dr == 'dr9-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols)
+        elif dr == 'dr9-south': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9south, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols, outdir=sweepdir, debug=debug, use_check=use_check)
+        elif dr == 'dr9-north': df = cut_sweeps(patch=patch, sweep_dir=sweep_dir_dr9north, rlimit=rlimit, maskbitsource=maskbitsource, opt=opt, cols=cols, outdir=sweepdir, debug=debug, use_check=use_check)
             
         #elif (dr is 'dr8') or (dr is 'dr9d'):
         #    if dr is 'dr8':
@@ -333,87 +460,91 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
         df = np.concatenate(tuple(catdict.values()))
         #print('===== CONCATENATION DONE... =====')
         '''
-        
-        tab = Table()
+        if opt == '3':
+            return df
         
         if cols == 'all':
             
+            tab = Table()
+
             for col in df.dtype.names:
                 tab[col] = df[col]
-        
-        else:
-            
-            for col in df.dtype.names:
-                if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR'): tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
-                elif col[:2] == 'MW': continue
-                elif col == 'FIBERFLUX_R': tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
-                elif col == 'GAIA_PHOT_G_MEAN_MAG': tab['G'] = df[col]
-                elif col == 'GAIA_ASTROMETRIC_EXCESS_NOISE': tab['AEN'] = df[col]
-                else: tab[col] = df[col]
-            tab['FLUX_R'] = df['FLUX_R']
-        
+
+#         else:
+
+#             for col in df.dtype.names:
+#                 if (col[:4] == 'FLUX') & (col[:9] != 'FLUX_IVAR'): tab[col[-1:]+'MAG'] = flux_to_mag(df['FLUX_'+col[-1:]]/df['MW_TRANSMISSION_'+col[-1:]])
+#                 elif col[:2] == 'MW': continue
+#                 elif col == 'FIBERFLUX_R': tab['RFIBERMAG'] = flux_to_mag(df[col]/df['MW_TRANSMISSION_R'])
+#                 elif col == 'GAIA_PHOT_G_MEAN_MAG': tab['G'] = df[col]
+#                 elif col == 'GAIA_ASTROMETRIC_EXCESS_NOISE': tab['AEN'] = df[col]
+#                 else: tab[col] = df[col]
+#             tab['FLUX_R'] = df['FLUX_R']
+
         # create BGSBITS: bits associated to selection criteria
         if bgsbits:
             
-            geocuts = getGeoCuts(df)
-            photcuts = getPhotCuts(df)
-            bgscuts = geocuts
-            bgscuts.update(photcuts)
-            
-            BGSBITS = np.zeros_like(df['RA'], dtype='i8')
-            BGSMASK = {}
-            #[BGSMASK[key] = bit for bit, key in enumerate(bgscuts.keys())]
-            
-            print('---- BGSMASK key: ---- ')
-            for bit, key in enumerate(bgscuts.keys()):
-                
-                BGSBITS |= bgscuts[key] * 2**(bit)
-                BGSMASK[key] = bit
-                print('\t %s, %i, %i' %(key, bit, 2**bit))
-            # bgs selection
-            #bgs = np.ones_like(df['RA'], dtype='?')
-            #for key, val in zip(bgscuts.keys(), bgscuts.values()):
-            #    if (key == 'allmask') or (key == 'MS'): continue
-            #    else: bgs &= val
-                    
-            # dont forget the magnitude dependance
-            #bgs &= flux_to_mag(df['FLUX_R']/df['MW_TRANSMISSION_R']) < 20
-            
-            bgs_any, bgs_bright, bgs_faint = get_bgs(df)
-            bgs_sv_any, bgs_sv_bright, bgs_sv_faint, bgs_sv_faint_ext, bgs_sv_fibmag, bgs_sv_lowq = get_bgs_sv(df)
-            
-            BGSsel = {'bgs_any':bgs_any, 'bgs_bright':bgs_bright, 'bgs_faint':bgs_faint}
-            BGSSVsel = {'bgs_sv_any':bgs_sv_any, 
-                'bgs_sv_bright':bgs_sv_bright, 
-                'bgs_sv_faint':bgs_sv_faint,
-                'bgs_sv_faint_ext':bgs_sv_faint_ext,
-                'bgs_sv_fibmag':bgs_sv_fibmag,
-                'bgs_sv_lowq':bgs_sv_lowq
-                #'bgs_sv_any_wqc':bgs_sv_any_wqc,
-                #'bgs_sv_lowq_wqc':bgs_sv_lowq_wqc
-               }
-            
-            for num, key in enumerate(BGSsel.keys()):
-                BGSBITS |= BGSsel[key] * 2**(20+num)
-                BGSMASK[key] = 20+num
-                print('\t %s, %i, %i' %(key, 20+num, 2**(20+num)))
-                
-            for num, key in enumerate(BGSSVsel.keys()):
-                BGSBITS |= BGSSVsel[key] * 2**(30+num)
-                BGSMASK[key] = 30+num
-                print('\t %s, %i, %i' %(key, 30+num, 2**(30+num)))
-            
-            tab['BGSBITS'] = BGSBITS
-            
-            # sanity check...
-            print('---- Sanity Check ---- ')
-            for bit, key in zip(BGSMASK.values(), BGSMASK.keys()):
-                if key in list(BGSsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
-                elif key in list(BGSSVsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSSVsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
-                else: print('\t %s, %i, %i' %(key, np.sum(bgscuts[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
-                
-            #print('\t %s, %i, %i' %('all', np.sum(bgs), np.sum(BGSBITS != 0)))
-                
+            tab = getBGSbits(cat=df, mycatpath=None, outdir=None, mycat=True, getmycat=True, tractor=False, verbose=True)
+
+#             geocuts = getGeoCuts(df)
+#             photcuts = getPhotCuts(df)
+#             bgscuts = geocuts
+#             bgscuts.update(photcuts)
+
+#             BGSBITS = np.zeros_like(df['RA'], dtype='i8')
+#             BGSMASK = {}
+#             #[BGSMASK[key] = bit for bit, key in enumerate(bgscuts.keys())]
+
+#             print('---- BGSMASK key: ---- ')
+#             for bit, key in enumerate(bgscuts.keys()):
+
+#                 BGSBITS |= bgscuts[key] * 2**(bit)
+#                 BGSMASK[key] = bit
+#                 print('\t %s, %i, %i' %(key, bit, 2**bit))
+#             # bgs selection
+#             #bgs = np.ones_like(df['RA'], dtype='?')
+#             #for key, val in zip(bgscuts.keys(), bgscuts.values()):
+#             #    if (key == 'allmask') or (key == 'MS'): continue
+#             #    else: bgs &= val
+
+#             # dont forget the magnitude dependance
+#             #bgs &= flux_to_mag(df['FLUX_R']/df['MW_TRANSMISSION_R']) < 20
+
+#             bgs_any, bgs_bright, bgs_faint = get_bgs(df)
+#             bgs_sv_any, bgs_sv_bright, bgs_sv_faint, bgs_sv_faint_ext, bgs_sv_fibmag, bgs_sv_lowq = get_bgs_sv(df)
+
+#             BGSsel = {'bgs_any':bgs_any, 'bgs_bright':bgs_bright, 'bgs_faint':bgs_faint}
+#             BGSSVsel = {'bgs_sv_any':bgs_sv_any, 
+#                 'bgs_sv_bright':bgs_sv_bright, 
+#                 'bgs_sv_faint':bgs_sv_faint,
+#                 'bgs_sv_faint_ext':bgs_sv_faint_ext,
+#                 'bgs_sv_fibmag':bgs_sv_fibmag,
+#                 'bgs_sv_lowq':bgs_sv_lowq
+#                 #'bgs_sv_any_wqc':bgs_sv_any_wqc,
+#                 #'bgs_sv_lowq_wqc':bgs_sv_lowq_wqc
+#                }
+
+#             for num, key in enumerate(BGSsel.keys()):
+#                 BGSBITS |= BGSsel[key] * 2**(20+num)
+#                 BGSMASK[key] = 20+num
+#                 print('\t %s, %i, %i' %(key, 20+num, 2**(20+num)))
+
+#             for num, key in enumerate(BGSSVsel.keys()):
+#                 BGSBITS |= BGSSVsel[key] * 2**(30+num)
+#                 BGSMASK[key] = 30+num
+#                 print('\t %s, %i, %i' %(key, 30+num, 2**(30+num)))
+
+#             tab['BGSBITS'] = BGSBITS
+
+#             # sanity check...
+#             print('---- Sanity Check ---- ')
+#             for bit, key in zip(BGSMASK.values(), BGSMASK.keys()):
+#                 if key in list(BGSsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+#                 elif key in list(BGSSVsel.keys()): print('\t %s, %i, %i' %(key, np.sum(BGSSVsel[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+#                 else: print('\t %s, %i, %i' %(key, np.sum(bgscuts[key]), np.sum((BGSBITS & 2**(bit)) != 0)))
+
+#             #print('\t %s, %i, %i' %('all', np.sum(bgs), np.sum(BGSBITS != 0)))
+
         print(sweepdir+sweep_file_name)
         np.save(sweepdir+sweep_file_name, tab)
     else:
@@ -423,7 +554,7 @@ def get_sweep_whole(patch=None, dr='dr8-south', rlimit=None, maskbitsource=False
     print('Total run time: %f sec' %(end - start))
     #get_area(patch, get_val = False)
     #print('Weight of %s catalogue: %s' %(sweep_file_name+'.npy', convert_size(os.path.getsize(sweep_file_name+'.npy'))))
-    
+
     if not sweep_file: 
         if opt == '1': return tab
         if opt == '2': return tab
@@ -471,7 +602,7 @@ def get_files_sweeps(sweep_dir=None, patch=None):
             
     return selected
     
-def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='2', cols=None):
+def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt='2', cols=None, outdir=None, debug=False, use_check=False):
     '''Main function to extract the data from the SWEEPS'''
     
     if cols == 'all':
@@ -617,8 +748,15 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
         start = time.time()
         sweep_files = get_files_sweeps(sweep_dir=sweep_dir, patch=patch)
         
+        if debug:
+            sweep_files = sweep_files[10:17]
+            #print(sweep_files)
+            N = 2
+        else:
+            N = 20
+        
         #divide sample into N subsamples to make it faster
-        N = 20
+        
         A = len(sweep_files) // N
         R = len(sweep_files) - (A * N)
         #print(A, A * N, R)
@@ -633,8 +771,21 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
         widgets = ['\x1b[32mProgress...\x1b[39m', progressbar.Percentage(),progressbar.Bar(markers='\x1b[32m$\x1b[39m')]
         
         file_names = []
+        checkpoint = {}
         
-        for num, sample in enumerate(B):
+        if use_check:
+            checkpoint = np.load(os.path.join(outdir, 'checkpoint.npy'), allow_pickle=True).item()
+        else:   
+            for num, sample in enumerate(B):
+                checkpoint[str(num+1)] = [sample, False]
+        
+        for num, (key, val) in enumerate(checkpoint.items()):
+            
+            sample = val[0]
+            done = val[1]
+            
+            if done: 
+                continue
             
             bar = progressbar.ProgressBar(widgets=widgets, max_value=len(sample)).start()
             catdict = {}
@@ -663,14 +814,20 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
 
                 time.sleep(0.1)
                 bar.update(i + 1)
+                
+                #print(file.split('/')[-1], len(cat), np.sum(keep))
 
             cat0 = np.concatenate(tuple(catdict.values()))
-            file_name = '/global/cscratch1/sd/qmxp55/bgstargets_output/dr9/tmp_%s' %(str(num))
+            file_name = os.path.join(outdir, 'tmp_%s' %(str(num)))
             file_names.append(file_name)
             np.save(file_name, cat0)
             del cat0
             print('====== %i / %i DONE... ======' %(num+1, len(B)))
-
+        
+            checkpoint[key][1] = True
+            np.save(os.path.join(outdir, 'checkpoint.npy'), checkpoint)
+            
+        
         end = time.time()
         print('Total run time: %f sec' %(end - start))
             
@@ -697,7 +854,8 @@ def cut_sweeps(patch=None, sweep_dir=None, rlimit=None, maskbitsource=False, opt
         
         print('Sample # objects: %i' %(len(cat0[list(cat0.keys())[0]])))
     
-    return cat0
+    if opt != '3':
+        return cat0
 
 def flux_to_mag(flux):
     mag = 22.5 - 2.5*np.log10(flux)
@@ -723,6 +881,8 @@ def bgsmask():
             'QC_FI2': 15,
             'QC_FF2': 16,
             'QC_IVAR': 17,
+            'rfibcol': 18,
+            'agns': 19,
             'bgs_any': 20,
             'bgs_bright': 21,
             'bgs_faint': 22,
@@ -731,9 +891,11 @@ def bgsmask():
             'bgs_sv_faint': 32,
             'bgs_sv_faint_ext': 33,
             'bgs_sv_fibmag': 34,
-            'bgs_sv_lowq': 35
-            #'bgs_sv_any_wqc': 36,
-            #'bgs_sv_lowq_wqc': 37
+            'bgs_sv_lowq': 35,
+            'bgs_any': 40,
+            'bgs_bright': 41,
+            'bgs_faint': 42,
+            'bgs_wise': 43,
             }
     
     return mask
@@ -1453,6 +1615,20 @@ def get_custom_svfields(ra, dec, survey='all'):
         
     return keep
 
+def get_gama_fields(ra, dec):
+    
+    fields = {}
+    
+    fields['g12'] = [174., 186., -3., 2.]
+    fields['g15'] = [211.5, 223.5, -2., 3.]
+    fields['g09'] = [129., 141., -2., 3.]
+    
+    keep = np.zeros_like(ra, dtype='?')
+    for key, val in zip(fields.keys(), fields.values()):
+        keep |= ((ra > val[0]) & (ra < val[1]) & (dec > val[2]) & (dec < val[3]))
+        
+    return keep
+
 def get_msmask(masksources):
     
     mag = np.zeros_like(masksources['RA'])
@@ -1740,3 +1916,40 @@ def gama_assess(cat=None, rmaglab=None, match=None, gamagal=None, mask=None, cum
         Ntot.append(Ntot_) #total; BGS if mask=bgs
         
     return np.array(rmagl), np.array(Ncomp), np.array(Ncont), np.array(Nincomp), np.array(Ngama_ls), np.array(Ntot)
+
+def n_density(mag, area, cumu=True, maglimits=[10, 21], binsize=0.1):
+    '''
+    Get the cumulative or non-cumulative number density
+    
+    mag: 1D array-like:: magnitude
+    area: float::integer:: area of sample
+    cumu: boolean:: True if cumulative False if non-cumulative
+    maglimits: 1D array-like:: magnitude lower and upper limits in the form [lower, upper]
+    binsize: float::integer:: bin size of the sample
+    
+    return
+    eta: 2D array-like:: first colum is the magnitude and second column is the density
+    '''
+    
+    eta = []
+    ini, fin = maglimits
+    rbin = np.int(np.abs(ini-fin)/binsize)
+    magrange = np.linspace(ini, fin, rbin)
+    
+    if cumu:
+    
+        for i in range(len(magrange)):
+
+            N = np.sum(mag < magrange[i])
+            eta.append([magrange[i], N/area])
+
+    else:
+        
+        for i in range(len(magrange[:-1])):
+
+            N = np.sum((mag < magrange[i+1]) & (mag > magrange[i]))
+            eta.append([magrange[i]+(binsize/2.), N/area])
+            
+    eta = np.array(eta).transpose()
+    
+    return eta
